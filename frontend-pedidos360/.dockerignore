@@ -1,0 +1,27 @@
+# Dependencias de Node (se reinstalan en el stage de build)
+node_modules/
+
+# Build anterior (el stage de build genera uno nuevo)
+dist/
+
+# Variables de entorno locales con secretos
+.env
+.env.local
+.env.*.local
+*.env
+
+# Control de versiones
+.git/
+.gitignore
+
+# IDEs
+.idea/
+.vscode/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

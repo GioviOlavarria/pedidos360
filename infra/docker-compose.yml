@@ -1,0 +1,174 @@
+# docker-compose.yml — Pedidos360
+# Ubicación: ProyectoJavaPedidos/infra/docker-compose.yml
+#
+# Estructura de carpetas asumida (todos al mismo nivel que /infra):
+#
+#   ProyectoJavaPedidos/
+#   ├── infra/                   ← este archivo
+#   ├── ms-pedidos360-bff/
+#   ├── ms-pedidos360-orders/
+#   ├── ms-pedidos360-catalog/
+#   └── frontend-pedidos360/
+#
+# Si clonaste cada repo en rutas distintas, ajusta los "context" de cada
+# servicio (marcados con # ← AJUSTAR) a la ruta absoluta o relativa correcta.
+#
+# Uso:
+#   cp .env.example .env         # completar valores reales
+#   docker compose up --build    # construir imágenes y levantar todo
+
+name: pedidos360
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Variables de entorno leídas automáticamente desde infra/.env
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MySQL ───────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: pedidos360-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE:      pedidos360_db
+      MYSQL_USER:          ${DB_USER}
+      MYSQL_PASSWORD:      ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - pedidos360-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── ms-pedidos360-orders ────────────────────────────────────────────────────
+  orders:
+    build:
+      context: ../ms-pedidos360-orders   # ← AJUSTAR si el repo está en otra ruta
+      dockerfile: Dockerfile
+    container_name: pedidos360-orders
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL:         jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER:        ${DB_USER}
+      DB_PASSWORD:    ${DB_PASSWORD}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI}
+      API_CLIENT_ID:  ${API_CLIENT_ID}
+    ports:
+      - "8081:8081"
+    networks:
+      - pedidos360-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+
+  # ── ms-pedidos360-catalog ───────────────────────────────────────────────────
+  catalog:
+    build:
+      context: ../ms-pedidos360-catalog  # ← AJUSTAR si el repo está en otra ruta
+      dockerfile: Dockerfile
+    container_name: pedidos360-catalog
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL:         jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER:        ${DB_USER}
+      DB_PASSWORD:    ${DB_PASSWORD}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI}
+      API_CLIENT_ID:  ${API_CLIENT_ID}
+    ports:
+      - "8082:8082"
+    networks:
+      - pedidos360-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+
+  # ── ms-pedidos360-bff ───────────────────────────────────────────────────────
+  bff:
+    build:
+      context: ../ms-pedidos360-bff      # ← AJUSTAR si el repo está en otra ruta
+      dockerfile: Dockerfile
+    container_name: pedidos360-bff
+    restart: unless-stopped
+    depends_on:
+      orders:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      # URLs internas: los servicios se resuelven por nombre dentro de la red.
+      ORDERS_SERVICE_URL:  http://orders:8081
+      CATALOG_SERVICE_URL: http://catalog:8082
+      JWT_ISSUER_URI:      ${JWT_ISSUER_URI}
+      API_CLIENT_ID:       ${API_CLIENT_ID}
+      AZURE_AD_TENANT_ID:  ${AZURE_AD_TENANT_ID}
+      AZURE_AD_CLIENT_ID:  ${AZURE_AD_CLIENT_ID}
+    ports:
+      - "8080:8080"
+    networks:
+      - pedidos360-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+
+  # ── frontend-pedidos360 ─────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend-pedidos360    # ← AJUSTAR si el repo está en otra ruta
+      dockerfile: Dockerfile
+      # Las variables VITE_* se incrustan en el bundle en tiempo de build.
+      # Si cambian, hay que reconstruir la imagen (docker compose up --build).
+      args:
+        VITE_BFF_URL:              ${VITE_BFF_URL}
+        VITE_AZURE_AD_CLIENT_ID:   ${AZURE_AD_CLIENT_ID}
+        VITE_AZURE_AD_TENANT_ID:   ${AZURE_AD_TENANT_ID}
+        VITE_API_CLIENT_ID:        ${API_CLIENT_ID}
+    container_name: pedidos360-frontend
+    restart: unless-stopped
+    depends_on:
+      bff:
+        condition: service_healthy
+    ports:
+      - "3000:80"    # Nginx escucha en 80 dentro del contenedor, mapeado a 3000
+    networks:
+      - pedidos360-net
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Volúmenes
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  mysql-data:
+    driver: local
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Red compartida: todos los servicios se resuelven por nombre de servicio
+# (mysql, orders, catalog, bff, frontend) dentro de esta red.
+# ─────────────────────────────────────────────────────────────────────────────
+networks:
+  pedidos360-net:
+    driver: bridge

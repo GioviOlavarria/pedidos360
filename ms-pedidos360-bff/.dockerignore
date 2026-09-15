@@ -1,0 +1,29 @@
+# Artefactos de compilación
+target/
+
+# Control de versiones
+.git/
+.gitignore
+
+# IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+
+# Variables de entorno locales
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+logs/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ms-pedidos360-bff
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+---
+# Perfil local: desarrollo directo en la máquina (sin Docker)
+spring:
+  config:
+    activate:
+      on-profile: local
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI}
+
+app:
+  services:
+    orders:
+      url: ${ORDERS_SERVICE_URL:http://localhost:8081}
+    catalog:
+      url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+
+---
+# Perfil docker: contenedor dentro de docker compose
+spring:
+  config:
+    activate:
+      on-profile: docker
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI}
+
+app:
+  services:
+    orders:
+      url: ${ORDERS_SERVICE_URL:http://orders:8081}
+    catalog:
+      url: ${CATALOG_SERVICE_URL:http://catalog:8082}

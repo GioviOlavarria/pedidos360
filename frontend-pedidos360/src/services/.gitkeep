@@ -1,0 +1,2 @@
+// Carpeta reservada para servicios de llamadas al BFF (axios, fetch wrappers, etc.)
+// Se irá poblando en próximas etapas del proyecto.
