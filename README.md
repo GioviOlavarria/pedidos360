@@ -1,4 +1,4 @@
-# 📦 Pedidos360
+# Pedidos360
 
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=java)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?logo=spring-boot)
@@ -9,7 +9,7 @@
 
 Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrollada con arquitectura de microservicios usando **Spring Boot (WebFlux / MVC)**, **React** y protegida corporativamente a través de **Microsoft Entra ID (Azure AD)**.
 
-## ✨ Características
+## Características
 - **Arquitectura BFF (Backend For Frontend)**: Patrón que canaliza las llamadas del cliente de forma reactiva (Spring WebFlux).
 - **Catálogo y Órdenes Independientes**: Microservicios separados para la gestión de productos e inventario, y para el flujo completo de compras.
 - **Autenticación Corporativa**: Integración nativa con Azure AD mediante MSAL-Browser y Spring Security OAuth2 (Roles: `Admin`, `Operator`, `Customer`).
@@ -19,7 +19,7 @@ Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrol
 
 ---
 
-## 🏗 Arquitectura del Sistema
+## Arquitectura del Sistema
 
 ```text
                      [Nginx]
@@ -35,7 +35,7 @@ Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrol
 
 ---
 
-## 🚀 Requisitos Previos
+## Requisitos Previos
 
 Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesitas:
 - [Docker](https://docs.docker.com/get-docker/) y Docker Compose instalados.
@@ -44,7 +44,7 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
 
 ---
 
-## ⚙️ Instrucciones de Ejecución
+## Instrucciones de Ejecución
 
 1. **Clona el repositorio** (Si aún no lo tienes localmente):
    ```bash
@@ -75,7 +75,7 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
 
 ---
 
-## 🔒 Roles y Permisos (Azure AD)
+## Roles y Permisos (Azure AD)
 La aplicación maneja 3 roles corporativos que deben ser definidos en el registro de tu aplicación en **Microsoft Entra ID**:
 - **Admin**: Acceso total. Visualiza reportes financieros exclusivos, gestiona catálogo completo, y modifica/crea órdenes.
 - **Operator**: Puede visualizar, cambiar estados de pedidos y ver/modificar catálogo de productos.
@@ -83,7 +83,7 @@ La aplicación maneja 3 roles corporativos que deben ser definidos en el registr
 
 > Para asignar un rol a un usuario, hazlo desde *Azure Portal > Entra ID > Aplicaciones Empresariales > [Tu App Frontend] > Usuarios y Grupos*.
 
-## 🛠 Tecnologías Utilizadas
+## Tecnologías Utilizadas
 
 ### Frontend
 * React 18, React Router DOM v7
