@@ -25,29 +25,6 @@ name: pedidos360
 
 services:
 
-  # ── MySQL ───────────────────────────────────────────────────────────────────
-  mysql:
-    image: mysql:8.0
-    container_name: pedidos360-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE:      pedidos360_db
-      MYSQL_USER:          ${DB_USER}
-      MYSQL_PASSWORD:      ${DB_PASSWORD}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - pedidos360-net
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   # ── ms-pedidos360-orders ────────────────────────────────────────────────────
   orders:
     build:
@@ -55,12 +32,9 @@ services:
       dockerfile: Dockerfile
     container_name: pedidos360-orders
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DB_URL:         jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_URL:         ${DB_URL}
       DB_USER:        ${DB_USER}
       DB_PASSWORD:    ${DB_PASSWORD}
       JWT_ISSUER_URI: ${JWT_ISSUER_URI}
@@ -83,12 +57,9 @@ services:
       dockerfile: Dockerfile
     container_name: pedidos360-catalog
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DB_URL:         jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_URL:         ${DB_URL}
       DB_USER:        ${DB_USER}
       DB_PASSWORD:    ${DB_PASSWORD}
       JWT_ISSUER_URI: ${JWT_ISSUER_URI}
@@ -157,13 +128,6 @@ services:
       - "3000:80"    # Nginx escucha en 80 dentro del contenedor, mapeado a 3000
     networks:
       - pedidos360-net
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Volúmenes
-# ─────────────────────────────────────────────────────────────────────────────
-volumes:
-  mysql-data:
-    driver: local
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Red compartida: todos los servicios se resuelven por nombre de servicio
