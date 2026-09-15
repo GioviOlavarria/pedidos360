@@ -11,6 +11,7 @@ function OrdersPage() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [listKey, setListKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
   
   const userRoles = useUserRoles();
   const canCreate = userRoles.some(r => r === 'Admin' || r === 'Customer' || r === 'Operator');
@@ -33,7 +34,7 @@ function OrdersPage() {
         </div>
         {canCreate && (
           <button 
-            onClick={() => setShowForm(true)}
+            onClick={() => { setEditingOrder(null); setShowForm(true); }}
             style={{
               background: ORANGE, color: '#fff', border: 'none', borderRadius: '8px',
               padding: '10px 20px', fontWeight: '700', fontSize: '0.9rem',
@@ -59,7 +60,11 @@ function OrdersPage() {
 
         <section style={{ position: 'sticky', top: '24px' }}>
           {selectedOrderId ? (
-            <OrderDetail orderId={selectedOrderId} onStatusChanged={handleRefresh} />
+            <OrderDetail 
+              orderId={selectedOrderId} 
+              onStatusChanged={handleRefresh} 
+              onEdit={(order) => { setEditingOrder(order); setShowForm(true); }}
+            />
           ) : (
             <div style={{
               background: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '14px',
@@ -74,9 +79,11 @@ function OrdersPage() {
 
       {showForm && (
         <OrderForm 
-          onClose={() => setShowForm(false)} 
+          initialOrder={editingOrder}
+          onClose={() => { setShowForm(false); setEditingOrder(null); }} 
           onCreated={() => {
             setShowForm(false);
+            setEditingOrder(null);
             handleRefresh();
           }} 
         />

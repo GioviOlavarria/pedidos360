@@ -11,6 +11,7 @@ public class OrderResponse {
     private OrderStatus status;
     private LocalDateTime createdAt;
     private BigDecimal total;
+    private java.util.List<OrderItemResponse> items;
 
     public OrderResponse() {
     }
@@ -61,5 +62,13 @@ public class OrderResponse {
 
     public void setTotal(BigDecimal total) {
         this.total = total;
+    }
+
+    public java.util.List<OrderItemResponse> getItems() {
+        return items;
+    }
+
+    public void setItems(java.util.List<OrderItemResponse> items) {
+        this.items = items;
     }
 }

@@ -95,7 +95,9 @@ class OrderServiceTest {
         when(orderRepository.save(any(Order.class))).thenReturn(createdOrder);
 
         // Act
-        Order result = orderService.createOrder(customerId, total);
+        com.pedidos360.orders.api.dto.OrderRequest request = new com.pedidos360.orders.api.dto.OrderRequest(customerId, total);
+        request.setItems(java.util.Collections.emptyList());
+        Order result = orderService.createOrder(request);
 
         // Assert
         assertNotNull(result);

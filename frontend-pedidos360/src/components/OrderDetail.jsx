@@ -14,7 +14,7 @@ const NEXT_STATUS = {
   CANCELADO: null,
 };
 
-function OrderDetail({ orderId, onStatusChanged }) {
+function OrderDetail({ orderId, onStatusChanged, onEdit }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -80,6 +80,13 @@ function OrderDetail({ orderId, onStatusChanged }) {
               </button>
             )}
             
+            <button 
+              onClick={() => onEdit(order)}
+              style={btnSecondaryStyle}
+            >
+              Editar Pedido
+            </button>
+            
             {order.status !== 'ENTREGADO' && order.status !== 'CANCELADO' && (
               <button 
                 onClick={() => handleUpdateStatus('CANCELADO')}
@@ -106,6 +113,11 @@ const cardStyle = {
 
 const btnPrimaryStyle = {
   background: NAVY, color: '#fff', border: 'none', borderRadius: '8px',
+  padding: '8px 16px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer',
+};
+
+const btnSecondaryStyle = {
+  background: '#f1f5f9', color: NAVY, border: '1px solid #cbd5e1', borderRadius: '8px',
   padding: '8px 16px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer',
 };
 

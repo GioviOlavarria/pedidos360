@@ -1,21 +1,35 @@
 import { useState, useEffect } from 'react';
 import { getProducts } from '../services/catalogService';
-import { createOrder } from '../services/ordersService';
+import { createOrder, updateOrder } from '../services/ordersService';
 
 const NAVY = '#003087';
 const ORANGE = '#FF6B00';
 
-function OrderForm({ onClose, onCreated }) {
+function OrderForm({ onClose, onCreated, initialOrder }) {
   const [products, setProducts] = useState([]);
   const [customerId, setCustomerId] = useState('');
-  const [items, setItems] = useState([]); // { product, quantity }
+  const [items, setItems] = useState([]); 
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getProducts().then(res => setProducts(res.data)).catch(console.error);
-  }, []);
+    getProducts().then(res => {
+      const allProducts = res.data;
+      setProducts(allProducts);
+
+      if (initialOrder) {
+        setCustomerId(initialOrder.customerId);
+        if (initialOrder.items) {
+          const mappedItems = initialOrder.items.map(i => {
+            const prod = allProducts.find(p => p.id === i.productId) || { id: i.productId, name: `Producto ${i.productId}`, price: i.unitPrice, stock: 999 };
+            return { product: prod, quantity: i.quantity };
+          });
+          setItems(mappedItems);
+        }
+      }
+    }).catch(console.error);
+  }, [initialOrder]);
 
   const handleAddItem = (productId) => {
     if (!productId) return;
@@ -47,13 +61,6 @@ function OrderForm({ onClose, onCreated }) {
       return;
     }
 
-    for (const item of items) {
-      if (item.quantity > item.product.stock) {
-        setError(`Stock insuficiente para: ${item.product.name}`);
-        return;
-      }
-    }
-
     setLoading(true);
     const payload = {
       customerId: parseInt(customerId),
@@ -66,12 +73,16 @@ function OrderForm({ onClose, onCreated }) {
     };
 
     try {
-      await createOrder(payload);
-      const { decreaseStock } = await import('../services/catalogService');
-      await Promise.all(items.map(i => decreaseStock(i.product.id, i.quantity)));
+      if (initialOrder) {
+        await updateOrder(initialOrder.id, payload);
+      } else {
+        await createOrder(payload);
+        const { decreaseStock } = await import('../services/catalogService');
+        await Promise.all(items.map(i => decreaseStock(i.product.id, i.quantity)));
+      }
       onCreated();
     } catch (err) {
-      setError('Error al crear el pedido.');
+      setError(`Error al ${initialOrder ? 'actualizar' : 'crear'} el pedido.`);
     } finally {
       setLoading(false);
     }
@@ -83,7 +94,7 @@ function OrderForm({ onClose, onCreated }) {
     <div style={overlayStyle}>
       <div style={modalStyle}>
         <div style={headerStyle}>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', color: NAVY }}>Nuevo Pedido</h2>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', color: NAVY }}>{initialOrder ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
           <button onClick={onClose} style={closeBtnStyle}>✕</button>
         </div>
 
@@ -145,7 +156,7 @@ function OrderForm({ onClose, onCreated }) {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
             <button type="button" onClick={onClose} style={btnCancelStyle}>Cancelar</button>
             <button type="submit" style={btnSubmitStyle} disabled={loading}>
-              {loading ? 'Creando...' : 'Crear Pedido'}
+              {loading ? 'Guardando...' : (initialOrder ? 'Guardar Cambios' : 'Crear Pedido')}
             </button>
           </div>
         </form>

@@ -22,9 +22,16 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest request) {
-        Order order = orderService.createOrder(request.getCustomerId(), request.getTotal());
+        Order order = orderService.createOrder(request);
         OrderResponse response = mapToResponse(order);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody OrderRequest request) {
+        Order order = orderService.updateOrder(id, request);
+        OrderResponse response = mapToResponse(order);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
@@ -53,12 +60,27 @@ public class OrderController {
     }
 
     private OrderResponse mapToResponse(Order order) {
-        return new OrderResponse(
+        OrderResponse response = new OrderResponse(
                 order.getId(),
                 order.getCustomerId(),
                 order.getStatus(),
                 order.getCreatedAt(),
                 order.getTotal()
         );
+        
+        if (order.getItems() != null) {
+            java.util.List<com.pedidos360.orders.api.dto.OrderItemResponse> itemResponses = new java.util.ArrayList<>();
+            for (com.pedidos360.orders.domain.model.OrderItem item : order.getItems()) {
+                com.pedidos360.orders.api.dto.OrderItemResponse itemResp = new com.pedidos360.orders.api.dto.OrderItemResponse();
+                itemResp.setId(item.getId());
+                itemResp.setProductId(item.getProductId());
+                itemResp.setQuantity(item.getQuantity());
+                itemResp.setUnitPrice(item.getUnitPrice());
+                itemResponses.add(itemResp);
+            }
+            response.setItems(itemResponses);
+        }
+        
+        return response;
     }
 }

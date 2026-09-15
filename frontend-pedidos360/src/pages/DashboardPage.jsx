@@ -1,23 +1,10 @@
 import { useMsal } from '@azure/msal-react';
 import useUserRoles from '../hooks/useUserRoles';
+import { useState, useEffect } from 'react';
+import { getOrders } from '../services/ordersService';
 
 const NAVY  = '#003087';
 const ORANGE = '#FF6B00';
-
-const STATS = [
-  { icon: '📦', value: '1,284', label: 'Pedidos este mes',   delta: '+8%',  up: true  },
-  { icon: '✅', value: '97.3%', label: 'Tasa de entrega',    delta: '+1.2%', up: true  },
-  { icon: '🕒', value: '18 min', label: 'Tiempo promedio',   delta: '-3min', up: true  },
-  { icon: '💰', value: '$284.5K', label: 'Ingresos del mes', delta: '+12%',  up: true  },
-];
-
-const RECENT_ORDERS = [
-  { id: 1042, customer: 'Empresa Andina S.A.',   status: 'ENTREGADO',      total: '$3,200', date: '14/09/2026' },
-  { id: 1041, customer: 'Distribuidora Norte',   status: 'DESPACHADO',     total: '$1,850', date: '14/09/2026' },
-  { id: 1040, customer: 'Comercial del Sur',     status: 'EN_PREPARACION', total: '$980',   date: '13/09/2026' },
-  { id: 1039, customer: 'Grupo Mercantil Ltda.', status: 'ACEPTADO',       total: '$5,640', date: '13/09/2026' },
-  { id: 1038, customer: 'Tienda Online MX',      status: 'CANCELADO',      total: '$420',   date: '12/09/2026' },
-];
 
 const STATUS_CFG = {
   CREADO:         { bg: '#dbeafe', color: '#1d4ed8', label: 'Creado' },
@@ -46,6 +33,46 @@ function DashboardPage() {
   const { accounts } = useMsal();
   const userRoles = useUserRoles();
   const userName = accounts[0]?.name?.split(' ')[0] ?? 'usuario';
+
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getOrders()
+      .then(res => setOrders(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Calcular métricas reales
+  const now = new Date();
+  const thisMonthOrders = orders.filter(o => {
+    const d = new Date(o.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  const totalThisMonth = thisMonthOrders.length;
+  const ingresosThisMonth = thisMonthOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+  
+  const entregados = orders.filter(o => o.status === 'ENTREGADO').length;
+  const cancelados = orders.filter(o => o.status === 'CANCELADO').length;
+  const enTransito = orders.filter(o => o.status === 'DESPACHADO').length;
+  const enPrep = orders.filter(o => o.status === 'EN_PREPARACION').length;
+  
+  const totalActivos = orders.length > 0 ? orders.length : 1; // evitar division por 0
+  const tasaEntrega = ((entregados / totalActivos) * 100).toFixed(1);
+
+  const STATS = [
+    { icon: '📦', value: totalThisMonth.toString(), label: 'Pedidos este mes',   delta: 'N/A',  up: true  },
+    { icon: '✅', value: `${tasaEntrega}%`, label: 'Tasa de entrega',    delta: 'N/A', up: true  },
+    { icon: '🕒', value: '18 min', label: 'Tiempo promedio',   delta: 'N/A', up: true  },
+    { icon: '💰', value: `$${ingresosThisMonth.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, label: 'Ingresos del mes', delta: 'N/A',  up: true  },
+  ];
+
+  // Ordenar por fecha descendente
+  const recentOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+
+  const pct = (val) => Math.round((val / totalActivos) * 100);
 
   return (
     <div style={{ padding: '32px 36px', minHeight: '100%' }}>
@@ -85,7 +112,7 @@ function DashboardPage() {
             <div style={{ fontSize: '1.8rem', fontWeight: '800', color: NAVY, lineHeight: 1 }}>{value}</div>
             <div style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '4px 0 8px' }}>{label}</div>
             <div style={{ fontSize: '0.75rem', fontWeight: '700', color: up ? '#15803d' : '#b91c1c' }}>
-              {up ? '▲' : '▼'} {delta} vs. mes anterior
+              --
             </div>
           </div>
         ))}
@@ -115,13 +142,15 @@ function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {RECENT_ORDERS.map((o, i) => (
-                <tr key={o.id} style={{ borderBottom: i < RECENT_ORDERS.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+              {recentOrders.length === 0 ? (
+                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay pedidos registrados</td></tr>
+              ) : recentOrders.map((o, i) => (
+                <tr key={o.id} style={{ borderBottom: i < recentOrders.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                   <td style={{ padding: '12px 10px', color: '#94a3b8', fontWeight: '600' }}>#{o.id}</td>
-                  <td style={{ padding: '12px 10px', color: NAVY, fontWeight: '600' }}>{o.customer}</td>
+                  <td style={{ padding: '12px 10px', color: NAVY, fontWeight: '600' }}>Cliente {o.customerId}</td>
                   <td style={{ padding: '12px 10px' }}><StatusPill status={o.status} /></td>
-                  <td style={{ padding: '12px 10px', fontWeight: '700', color: NAVY }}>{o.total}</td>
-                  <td style={{ padding: '12px 10px', color: '#94a3b8' }}>{o.date}</td>
+                  <td style={{ padding: '12px 10px', fontWeight: '700', color: NAVY }}>${o.total.toFixed(2)}</td>
+                  <td style={{ padding: '12px 10px', color: '#94a3b8' }}>{new Date(o.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -140,10 +169,10 @@ function DashboardPage() {
               Distribución de pedidos
             </h2>
             {[
-              { label: 'Entregados',     pct: 68, color: '#15803d' },
-              { label: 'En tránsito',    pct: 20, color: ORANGE },
-              { label: 'En preparación', pct: 8,  color: '#854d0e' },
-              { label: 'Cancelados',     pct: 4,  color: '#b91c1c' },
+              { label: 'Entregados',     pct: pct(entregados), color: '#15803d' },
+              { label: 'En tránsito',    pct: pct(enTransito), color: ORANGE },
+              { label: 'En preparación', pct: pct(enPrep),  color: '#854d0e' },
+              { label: 'Cancelados',     pct: pct(cancelados),  color: '#b91c1c' },
             ].map(({ label, pct, color }) => (
               <div key={label} style={{ marginBottom: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '5px' }}>

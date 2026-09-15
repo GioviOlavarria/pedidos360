@@ -38,3 +38,13 @@ export function createOrder(data) {
 export function updateOrderStatus(id, status) {
   return apiClient.patch(`${BASE}/${id}/status`, null, { params: { status } });
 }
+
+/**
+ * Actualiza un pedido completo (cliente e ítems).
+ * @param {number|string} id
+ * @param {Object} data
+ * @returns {Promise<import('axios').AxiosResponse>}
+ */
+export function updateOrder(id, data) {
+  return apiClient.put(`${BASE}/${id}`, data);
+}

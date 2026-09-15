@@ -19,12 +19,39 @@ public class OrderService {
     @Autowired
     private OrderRepository orderRepository;
 
-    public Order createOrder(Long customerId, BigDecimal total) {
+    public Order createOrder(com.pedidos360.orders.api.dto.OrderRequest request) {
         Order order = new Order();
-        order.setCustomerId(customerId);
+        order.setCustomerId(request.getCustomerId());
         order.setStatus(OrderStatus.CREADO);
         order.setCreatedAt(LocalDateTime.now());
-        order.setTotal(total);
+        order.setTotal(request.getTotal());
+        
+        if (request.getItems() != null) {
+            for (com.pedidos360.orders.api.dto.OrderItemRequest itemReq : request.getItems()) {
+                com.pedidos360.orders.domain.model.OrderItem item = new com.pedidos360.orders.domain.model.OrderItem(
+                    itemReq.getProductId(), itemReq.getQuantity(), itemReq.getUnitPrice());
+                order.addItem(item);
+            }
+        }
+        
+        return orderRepository.save(order);
+    }
+
+    public Order updateOrder(Long id, com.pedidos360.orders.api.dto.OrderRequest request) {
+        Order order = findById(id);
+        order.setCustomerId(request.getCustomerId());
+        order.setTotal(request.getTotal());
+        
+        order.getItems().clear();
+        
+        if (request.getItems() != null) {
+            for (com.pedidos360.orders.api.dto.OrderItemRequest itemReq : request.getItems()) {
+                com.pedidos360.orders.domain.model.OrderItem item = new com.pedidos360.orders.domain.model.OrderItem(
+                    itemReq.getProductId(), itemReq.getQuantity(), itemReq.getUnitPrice());
+                order.addItem(item);
+            }
+        }
+        
         return orderRepository.save(order);
     }
 

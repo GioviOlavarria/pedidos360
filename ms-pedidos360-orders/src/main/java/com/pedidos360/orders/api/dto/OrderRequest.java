@@ -14,6 +14,8 @@ public class OrderRequest {
     @Positive(message = "total debe ser positivo")
     private BigDecimal total;
 
+    private java.util.List<OrderItemRequest> items;
+
     public OrderRequest() {
     }
 
@@ -36,5 +38,13 @@ public class OrderRequest {
 
     public void setTotal(BigDecimal total) {
         this.total = total;
+    }
+
+    public java.util.List<OrderItemRequest> getItems() {
+        return items;
+    }
+
+    public void setItems(java.util.List<OrderItemRequest> items) {
+        this.items = items;
     }
 }
