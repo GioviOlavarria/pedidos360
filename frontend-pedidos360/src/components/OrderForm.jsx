@@ -40,16 +40,24 @@ function OrderForm({ onClose, onCreated }) {
     setItems(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: qty } : i));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!customerId || items.length === 0) {
       setError('Ingrese un cliente y al menos un producto.');
       return;
     }
 
+    for (const item of items) {
+      if (item.quantity > item.product.stock) {
+        setError(`Stock insuficiente para: ${item.product.name}`);
+        return;
+      }
+    }
+
     setLoading(true);
     const payload = {
       customerId: parseInt(customerId),
+      total: items.reduce((acc, i) => acc + (i.product.price * i.quantity), 0),
       items: items.map(i => ({
         productId: i.product.id,
         quantity: i.quantity,
@@ -57,10 +65,16 @@ function OrderForm({ onClose, onCreated }) {
       }))
     };
 
-    createOrder(payload)
-      .then(() => onCreated())
-      .catch(() => setError('Error al crear el pedido. Verifique stock.'))
-      .finally(() => setLoading(false));
+    try {
+      await createOrder(payload);
+      const { decreaseStock } = await import('../services/catalogService');
+      await Promise.all(items.map(i => decreaseStock(i.product.id, i.quantity)));
+      onCreated();
+    } catch (err) {
+      setError('Error al crear el pedido.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const total = items.reduce((acc, i) => acc + (i.product.price * i.quantity), 0);
