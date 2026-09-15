@@ -48,8 +48,8 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
 
 1. **Clona el repositorio** (Si aún no lo tienes localmente):
    ```bash
-   git clone https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-   cd ProyectoJavaPedidos
+   git clone https://github.com/GioviOlavarria/pedidos360
+   cd pedidos360
    ```
 
 2. **Configura las variables de entorno**:
