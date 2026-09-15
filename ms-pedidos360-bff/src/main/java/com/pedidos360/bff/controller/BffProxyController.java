@@ -21,7 +21,7 @@ public class BffProxyController {
         this.ordersClient = ordersClient;
     }
 
-    @RequestMapping(value = "/api/catalog/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
+    @RequestMapping(value = {"/api/catalog", "/api/catalog/**"}, method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
     public Mono<ResponseEntity<byte[]>> proxyCatalog(
             @RequestHeader HttpHeaders headers,
             HttpMethod method,
@@ -48,7 +48,7 @@ public class BffProxyController {
         return spec.retrieve().toEntity(byte[].class);
     }
 
-    @RequestMapping(value = "/api/orders/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
+    @RequestMapping(value = {"/api/orders", "/api/orders/**"}, method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
     public Mono<ResponseEntity<byte[]>> proxyOrders(
             @RequestHeader HttpHeaders headers,
             HttpMethod method,
