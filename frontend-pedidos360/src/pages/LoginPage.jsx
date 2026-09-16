@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { loginRequest } from '../authConfig';
+import useUserRoles from '../hooks/useUserRoles';
 
 /* ── Paleta Blue Express-inspired ───────────────────────────────────────── */
 const NAVY  = '#003087';
@@ -11,10 +12,14 @@ function LoginPage() {
   const { instance } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const navigate = useNavigate();
+  const userRoles = useUserRoles();
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) {
+      const dest = userRoles.includes('Admin') ? '/dashboard' : '/catalog';
+      navigate(dest, { replace: true });
+    }
+  }, [isAuthenticated, userRoles, navigate]);
 
   function handleLogin() {
     instance.loginRedirect(loginRequest).catch(console.error);

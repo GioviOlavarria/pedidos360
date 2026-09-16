@@ -26,9 +26,31 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                        .jwt(jwt -> jwt
+                                .decoder(jwtDecoder())
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
                 );
         return http.build();
+    }
+
+    @Bean
+    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
+        org.springframework.security.oauth2.jwt.NimbusJwtDecoder decoder =
+                org.springframework.security.oauth2.jwt.NimbusJwtDecoder
+                        .withJwkSetUri("https://login.microsoftonline.com/common/discovery/v2.0/keys")
+                        .build();
+
+        org.springframework.security.oauth2.core.OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> validator =
+                new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
+                        new org.springframework.security.oauth2.jwt.JwtTimestampValidator(),
+                        new org.springframework.security.oauth2.jwt.JwtClaimValidator<String>(
+                                org.springframework.security.oauth2.jwt.JwtClaimNames.ISS,
+                                iss -> iss != null && iss.startsWith("https://login.microsoftonline.com/")
+                        )
+                );
+        decoder.setJwtValidator(validator);
+        return decoder;
     }
 
     /**

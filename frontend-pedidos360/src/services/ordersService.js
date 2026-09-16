@@ -48,3 +48,12 @@ export function updateOrderStatus(id, status) {
 export function updateOrder(id, data) {
   return apiClient.put(`${BASE}/${id}`, data);
 }
+
+/**
+ * Elimina un pedido.
+ * @param {number|string} id
+ * @returns {Promise<import('axios').AxiosResponse>}
+ */
+export function deleteOrder(id) {
+  return apiClient.delete(`${BASE}/${id}`);
+}

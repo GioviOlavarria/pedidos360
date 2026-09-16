@@ -13,13 +13,9 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * FK gestionada por la relación @OneToMany/@JoinColumn en Order.
-     * insertable=false, updatable=false para evitar conflicto de mapeo duplicado.
-     */
-    @NotNull
-    @Column(name = "order_id", nullable = false, insertable = false, updatable = false)
-    private Long orderId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
 
     @NotNull
     @Column(name = "product_id", nullable = false)
@@ -53,7 +49,15 @@ public class OrderItem {
     }
 
     public Long getOrderId() {
-        return orderId;
+        return order != null ? order.getId() : null;
+    }
+
+    public Order getOrder() {
+        return order;
+    }
+
+    public void setOrder(Order order) {
+        this.order = order;
     }
 
     public Long getProductId() {

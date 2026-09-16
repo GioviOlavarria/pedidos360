@@ -36,7 +36,7 @@ function AccessDenied() {
  *
  * Si allowedRoles está vacío ([]) se interpreta como "cualquier usuario autenticado".
  */
-function ProtectedRoute({ children, allowedRoles = [] }) {
+function ProtectedRoute({ children, allowedRoles = [], redirectTo = null }) {
   const isAuthenticated = useIsAuthenticated();
   const userRoles       = useUserRoles();
 
@@ -47,7 +47,10 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   // allowedRoles vacío → sólo requiere estar autenticado
   if (allowedRoles.length > 0) {
     const hasRole = userRoles.some((role) => allowedRoles.includes(role));
-    if (!hasRole) return <AccessDenied />;
+    if (!hasRole) {
+      if (redirectTo) return <Navigate to={redirectTo} replace />;
+      return <AccessDenied />;
+    }
   }
 
   return children;

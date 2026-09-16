@@ -26,9 +26,9 @@ function AppRoutes() {
       <Route path="/login"         element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={[]}><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Admin', 'Operator']} redirectTo="/catalog"><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
       <Route path="/orders" element={<ProtectedRoute allowedRoles={['Admin', 'Operator', 'Customer']}><AppLayout><OrdersPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/catalog" element={<ProtectedRoute allowedRoles={['Admin', 'Operator']}><AppLayout><CatalogPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/catalog" element={<ProtectedRoute allowedRoles={['Admin', 'Operator', 'Customer']}><AppLayout><CatalogPage /></AppLayout></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute allowedRoles={['Admin']}><AppLayout><ReportsPage /></AppLayout></ProtectedRoute>} />
     </Routes>
   );

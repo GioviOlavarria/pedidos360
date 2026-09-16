@@ -47,3 +47,12 @@ export function updateProduct(id, data) {
 export function decreaseStock(id, quantity) {
   return apiClient.patch(`${BASE}/${id}/stock`, null, { params: { quantity } });
 }
+
+/**
+ * Elimina un producto.
+ * @param {number|string} id
+ * @returns {Promise<import('axios').AxiosResponse>}
+ */
+export function deleteProduct(id) {
+  return apiClient.delete(`${BASE}/${id}`);
+}

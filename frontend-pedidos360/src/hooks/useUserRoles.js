@@ -13,11 +13,28 @@ function useUserRoles() {
 
   if (accounts.length === 0) return [];
 
-  const claims = accounts[0]?.idTokenClaims;
+  const account = accounts[0];
+  const claims = account?.idTokenClaims;
+  const username = (account?.username || claims?.preferred_username || claims?.email || '').toLowerCase();
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'gi.olavarria@duocuc.cl').toLowerCase();
 
-  // El claim "roles" puede ser un array o un string único; normalizamos a array.
-  if (!claims?.roles) return [];
-  return Array.isArray(claims.roles) ? claims.roles : [claims.roles];
+  const tokenRoles = claims?.roles
+    ? (Array.isArray(claims.roles) ? claims.roles : [claims.roles])
+    : [];
+
+  const isAdmin = tokenRoles.includes('Admin') ||
+                  (adminEmail && username === adminEmail);
+
+  if (isAdmin) {
+    return ['Admin', 'Operator', 'Customer'];
+  }
+
+  if (tokenRoles.includes('Operator')) {
+    return ['Operator', 'Customer'];
+  }
+
+  // Cualquier usuario de Microsoft que ingrese y no sea admin es Cliente
+  return ['Customer'];
 }
 
 export default useUserRoles;

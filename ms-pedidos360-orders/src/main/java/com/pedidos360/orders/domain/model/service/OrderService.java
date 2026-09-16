@@ -60,6 +60,13 @@ public class OrderService {
         return orderRepository.findAll();
     }
 
+    public void deleteOrder(Long id) {
+        if (!orderRepository.existsById(id)) {
+            throw new IllegalArgumentException("Order no encontrada: " + id);
+        }
+        orderRepository.deleteById(id);
+    }
+
     @Transactional(readOnly = true)
     public Order findById(Long id) {
         return orderRepository.findById(id)

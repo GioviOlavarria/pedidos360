@@ -3,37 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import { EventType } from '@azure/msal-browser';
 
+import useUserRoles from '../hooks/useUserRoles';
+
 /**
  * AuthCallbackPage
  * Azure AD hace redirect a /auth/callback luego del login.
  * MSAL procesa automáticamente el hash/query de la URL al inicializar.
- * Este componente espera el evento LOGIN_SUCCESS y navega a /dashboard.
- *
- * Si MSAL ya procesó el token antes de montar este componente
- * (accounts.length > 0), navega de inmediato.
+ * Si es Admin va a /dashboard, si es Cliente va a /catalog.
  */
 function AuthCallbackPage() {
-  const { instance, accounts } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const navigate = useNavigate();
+  const userRoles = useUserRoles();
 
   useEffect(() => {
-    // Si ya hay cuenta activa (MSAL procesó el token), ir directo
-    if (accounts.length > 0) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-
-    // Escuchar el evento de login exitoso en caso de que todavía esté procesando
-    const callbackId = instance.addEventCallback((event) => {
-      if (event.eventType === EventType.LOGIN_SUCCESS && event.payload) {
-        navigate('/dashboard', { replace: true });
+    // Solo decidir y navegar cuando MSAL haya terminado de procesar todo.
+    if (inProgress === 'none') {
+      if (accounts.length > 0) {
+        const dest = userRoles.includes('Admin') ? '/dashboard' : '/catalog';
+        navigate(dest, { replace: true });
+      } else {
+        // Si terminó y no hay cuenta, algo falló o se canceló, volver al login
+        navigate('/login', { replace: true });
       }
-    });
-
-    return () => {
-      if (callbackId) instance.removeEventCallback(callbackId);
-    };
-  }, [instance, accounts, navigate]);
+    }
+  }, [inProgress, accounts, userRoles, navigate]);
 
   return (
     <div style={containerStyle}>

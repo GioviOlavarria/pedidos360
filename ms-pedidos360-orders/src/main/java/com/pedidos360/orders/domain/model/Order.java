@@ -34,8 +34,7 @@ public class Order {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "order_id")
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> items = new ArrayList<>();
 
     public Order() {
@@ -98,9 +97,11 @@ public class Order {
 
     public void addItem(OrderItem item) {
         this.items.add(item);
+        item.setOrder(this);
     }
 
     public void removeItem(OrderItem item) {
         this.items.remove(item);
+        item.setOrder(null);
     }
 }

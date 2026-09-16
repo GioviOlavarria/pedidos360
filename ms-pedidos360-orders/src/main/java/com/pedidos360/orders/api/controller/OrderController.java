@@ -59,6 +59,12 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
+        orderService.deleteOrder(id);
+        return ResponseEntity.noContent().build();
+    }
+
     private OrderResponse mapToResponse(Order order) {
         OrderResponse response = new OrderResponse(
                 order.getId(),

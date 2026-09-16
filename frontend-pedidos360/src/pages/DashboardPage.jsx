@@ -2,6 +2,7 @@ import { useMsal } from '@azure/msal-react';
 import useUserRoles from '../hooks/useUserRoles';
 import { useState, useEffect } from 'react';
 import { getOrders } from '../services/ordersService';
+import { formatMoney } from '../utils/userUtils';
 
 const NAVY  = '#003087';
 const ORANGE = '#FF6B00';
@@ -149,7 +150,7 @@ function DashboardPage() {
                   <td style={{ padding: '12px 10px', color: '#94a3b8', fontWeight: '600' }}>#{o.id}</td>
                   <td style={{ padding: '12px 10px', color: NAVY, fontWeight: '600' }}>Cliente {o.customerId}</td>
                   <td style={{ padding: '12px 10px' }}><StatusPill status={o.status} /></td>
-                  <td style={{ padding: '12px 10px', fontWeight: '700', color: NAVY }}>${o.total.toFixed(2)}</td>
+                  <td style={{ padding: '12px 10px', fontWeight: '700', color: NAVY }}>{formatMoney(o.total)}</td>
                   <td style={{ padding: '12px 10px', color: '#94a3b8' }}>{new Date(o.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}

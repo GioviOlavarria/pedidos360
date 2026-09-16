@@ -25,8 +25,27 @@ public class SecurityConfig {
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> {}) // issuer-uri se configura en application.yml
+                        .jwt(jwt -> jwt.jwtDecoder(reactiveJwtDecoder()))
                 )
                 .build();
+    }
+
+    @Bean
+    public org.springframework.security.oauth2.jwt.ReactiveJwtDecoder reactiveJwtDecoder() {
+        org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder decoder =
+                org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder
+                        .withJwkSetUri("https://login.microsoftonline.com/common/discovery/v2.0/keys")
+                        .build();
+
+        org.springframework.security.oauth2.core.OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> validator =
+                new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
+                        new org.springframework.security.oauth2.jwt.JwtTimestampValidator(),
+                        new org.springframework.security.oauth2.jwt.JwtClaimValidator<String>(
+                                org.springframework.security.oauth2.jwt.JwtClaimNames.ISS,
+                                iss -> iss != null && iss.startsWith("https://login.microsoftonline.com/")
+                        )
+                );
+        decoder.setJwtValidator(validator);
+        return decoder;
     }
 }

@@ -12,8 +12,8 @@ function AppLayout({ children }) {
 
   const userName      = accounts[0]?.name ?? accounts[0]?.username ?? 'Usuario';
   const userInitial   = userName.charAt(0).toUpperCase();
-  const canSeeCatalog = userRoles.some(r => r === 'Admin' || r === 'Operator');
-  const isAdmin       = userRoles.some(r => r === 'Admin');
+  const isAdmin       = userRoles.includes('Admin');
+  const isCustomer    = !isAdmin && userRoles.includes('Customer');
 
   return (
     <div style={{
@@ -25,8 +25,8 @@ function AppLayout({ children }) {
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       <aside style={{
-        width: '240px',
-        minWidth: '240px',
+        width: '250px',
+        minWidth: '250px',
         background: NAVY,
         display: 'flex',
         flexDirection: 'column',
@@ -50,9 +50,14 @@ function AppLayout({ children }) {
               <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
           </div>
-          <span style={{ color: '#fff', fontSize: '1.15rem', fontWeight: '800', letterSpacing: '-0.3px' }}>
-            Pedidos<span style={{ color: ORANGE }}>360</span>
-          </span>
+          <div>
+            <span style={{ color: '#fff', fontSize: '1.15rem', fontWeight: '800', letterSpacing: '-0.3px', display: 'block' }}>
+              Pedidos<span style={{ color: ORANGE }}>360</span>
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {isAdmin ? 'Panel Administrador' : 'Portal Cliente'}
+            </span>
+          </div>
         </div>
 
         {/* Nav */}
@@ -62,13 +67,25 @@ function AppLayout({ children }) {
             textTransform: 'uppercase', letterSpacing: '0.1em',
             padding: '0 10px', marginBottom: '8px',
           }}>
-            Menú
+            Menú {isAdmin ? 'Administrativo' : 'Principal'}
           </p>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <NavItem to="/dashboard" icon="🏠" label="Panel principal" end />
-            <NavItem to="/orders"    icon="📦" label="Pedidos" />
-            {canSeeCatalog && <NavItem to="/catalog" icon="🗂️" label="Catálogo" />}
-            {isAdmin && <NavItem to="/reports" icon="📊" label="Reportes" />}
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {isAdmin && (
+              <NavItem to="/dashboard" icon="🏠" label="Panel principal" end />
+            )}
+            <NavItem 
+              to="/catalog" 
+              icon={isAdmin ? "🗂️" : "🛍️"} 
+              label={isAdmin ? "Catálogo e Inventario" : "Catálogo y Tienda"} 
+            />
+            <NavItem 
+              to="/orders" 
+              icon="📦" 
+              label={isAdmin ? "Gestión de Pedidos" : "Mis Pedidos"} 
+            />
+            {isAdmin && (
+              <NavItem to="/reports" icon="📊" label="Reportes Financieros" />
+            )}
           </ul>
         </nav>
 
@@ -77,7 +94,7 @@ function AppLayout({ children }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '50%',
-              background: ORANGE,
+              background: isAdmin ? ORANGE : '#10b981',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '0.9rem', fontWeight: '800', color: '#fff', flexShrink: 0,
             }}>
@@ -90,14 +107,15 @@ function AppLayout({ children }) {
               }}>
                 {userName}
               </div>
-              {userRoles.length > 0 && (
-                <div style={{
-                  fontSize: '0.68rem', color: ORANGE, fontWeight: '700',
-                  textTransform: 'uppercase', letterSpacing: '0.04em',
-                }}>
-                  {userRoles[0]}
-                </div>
-              )}
+              <div style={{
+                fontSize: '0.68rem', 
+                color: isAdmin ? ORANGE : '#34d399', 
+                fontWeight: '700',
+                textTransform: 'uppercase', 
+                letterSpacing: '0.04em',
+              }}>
+                {isAdmin ? 'ADMINISTRADOR' : 'CLIENTE'}
+              </div>
             </div>
           </div>
           <LogoutButton />
