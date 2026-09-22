@@ -5,6 +5,8 @@ import com.pedidos360.catalog.dto.ProductResponse;
 import com.pedidos360.catalog.entity.Product;
 import com.pedidos360.catalog.service.ProductService;
 import jakarta.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,16 +17,12 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/catalog")
 public class ProductController {
-
-    private final ProductService productService;
-
-    public ProductController(ProductService productService) {
-        this.productService = productService;
-    }
+    @Autowired
+    private ProductService productService;
 
     @PostMapping
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
-        Product product = new Product(request.getName(), request.getDescription(),
+        Product product = new Product( null, request.getName(), request.getDescription(),
                 request.getPrice(), request.getStock());
         Product created = productService.create(product);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created));
@@ -48,7 +46,7 @@ public class ProductController {
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> update(@PathVariable Long id,
                                                   @Valid @RequestBody ProductRequest request) {
-        Product productDetails = new Product(request.getName(), request.getDescription(),
+        Product productDetails = new Product(id, request.getName(), request.getDescription(),
                 request.getPrice(), request.getStock());
         Product updated = productService.update(id, productDetails);
         return ResponseEntity.ok(toResponse(updated));
