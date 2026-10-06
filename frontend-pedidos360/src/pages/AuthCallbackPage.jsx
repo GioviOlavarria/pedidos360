@@ -17,29 +17,51 @@ function AuthCallbackPage() {
   const userRoles = useUserRoles();
 
   useEffect(() => {
-    // 1. Si ya tenemos cuenta y no hay nada en progreso, redirigimos
-    if (inProgress === 'none') {
-      if (accounts.length > 0) {
-        const dest = userRoles.includes('Admin') ? '/dashboard' : '/catalog';
-        navigate(dest, { replace: true });
-      } else {
-        navigate('/login', { replace: true });
-      }
+    // Si ya procesó y tenemos cuenta, navegamos a donde corresponda
+    if (accounts.length > 0) {
+      const account = accounts[0];
+      const claims = account?.idTokenClaims || {};
+      console.log('=== DEBUG LOGIN (cuenta ya cargada) ===');
+      console.log('account.username:', account?.username);
+      console.log('claims.preferred_username:', claims.preferred_username);
+      console.log('claims.email:', claims.email);
+      console.log('claims (completo):', JSON.stringify(claims));
+      console.log('userRoles:', JSON.stringify(userRoles));
+      console.log('=======================================');
+      const dest = userRoles.includes('Admin') ? '/dashboard' : '/catalog';
+      console.log('Navegando a:', dest);
+      navigate(dest, { replace: true });
       return;
     }
 
-    // 2. Si todavía está procesando el redirect, escuchamos el evento
+    // Si no hay cuenta aún, esperamos el evento de MSAL en lugar de redirigir ciegamente
     const callbackId = instance.addEventCallback((event) => {
       if (event.eventType === EventType.LOGIN_SUCCESS && event.payload) {
-        // En lugar de depender del estado (que puede estar desactualizado),
-        // calculamos el rol directamente del payload del evento.
         const claims = event.payload.idTokenClaims || {};
-        const username = (event.payload.account?.username || claims.preferred_username || claims.email || '').toLowerCase();
-        const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'gi.olavarria@duocuc.cl').toLowerCase();
+        const accountUsername = (event.payload.account?.username || '').toLowerCase();
+        const preferredUsername = (claims.preferred_username || '').toLowerCase();
+        const emailClaim = (claims.email || '').toLowerCase();
+        
+        // DEBUG: Muestra en consola lo que devuelve Azure AD
+        console.log('=== DEBUG LOGIN ===');
+        console.log('account.username:', event.payload.account?.username);
+        console.log('claims.preferred_username:', claims.preferred_username);
+        console.log('claims.email:', claims.email);
+        console.log('claims.upn:', claims.upn);
+        console.log('claims.unique_name:', claims.unique_name);
+        console.log('claims (completo):', JSON.stringify(claims));
+        console.log('==================');
         
         const tokenRoles = claims.roles ? (Array.isArray(claims.roles) ? claims.roles : [claims.roles]) : [];
-        const isAdmin = tokenRoles.includes('Admin') || (adminEmail && username === adminEmail);
         
+        const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase();
+        const matchesAdmin = (str) => adminEmail && str.includes(adminEmail);
+        const isAdmin = tokenRoles.includes('Admin') || 
+                       matchesAdmin(accountUsername) || 
+                       matchesAdmin(preferredUsername) || 
+                       matchesAdmin(emailClaim);
+        
+        console.log('isAdmin resultado:', isAdmin);
         navigate(isAdmin ? '/dashboard' : '/catalog', { replace: true });
       }
       
@@ -51,7 +73,7 @@ function AuthCallbackPage() {
     return () => {
       if (callbackId) instance.removeEventCallback(callbackId);
     };
-  }, [instance, accounts, inProgress, userRoles, navigate]);
+  }, [instance, accounts, userRoles, navigate]);
 
   return (
     <div style={containerStyle}>

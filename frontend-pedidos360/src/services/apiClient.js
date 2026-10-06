@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
-import { msalInstance, loginRequest } from '../authConfig';
+import { msalInstance, apiTokenRequest } from '../authConfig';
 
 /**
  * ─── ¿Cómo se usa msalInstance fuera de React? ────────────────────────────────
@@ -42,7 +42,7 @@ apiClient.interceptors.request.use(async (config) => {
   if (accounts.length === 0) return config;
 
   const tokenRequest = {
-    ...loginRequest,
+    ...apiTokenRequest,
     account: accounts[0],
   };
 

@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
-import { useIsAuthenticated } from '@azure/msal-react';
+import { useIsAuthenticated, useMsal } from '@azure/msal-react';
+import { InteractionStatus } from '@azure/msal-browser';
 import useUserRoles from '../hooks/useUserRoles';
 
 /**
@@ -25,6 +26,7 @@ function AccessDenied() {
  * Guarda de rutas basada en autenticación y roles de Azure AD.
  *
  * Comportamiento:
+ *  - MSAL procesando (redirect en curso) → muestra "Cargando..." en lugar de redirigir
  *  - No autenticado              → redirige a /login (replace para no romper el historial)
  *  - Autenticado sin rol requerido → muestra <AccessDenied>
  *  - Autenticado con rol requerido → renderiza {children}
@@ -37,8 +39,16 @@ function AccessDenied() {
  * Si allowedRoles está vacío ([]) se interpreta como "cualquier usuario autenticado".
  */
 function ProtectedRoute({ children, allowedRoles = [], redirectTo = null }) {
+  const { inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const userRoles       = useUserRoles();
+
+  // MSAL todavía está procesando el redirect/token — esperar sin redirigir
+  if (inProgress !== InteractionStatus.None) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <p style={{ color: '#374151' }}>Cargando...</p>
+    </div>;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

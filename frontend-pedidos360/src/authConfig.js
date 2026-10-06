@@ -20,16 +20,20 @@ export const msalConfig = {
 };
 
 /**
- * Scopes pedidos en cada login/token.
- * openid + profile  → claims básicos del usuario en el id_token.
- * access_as_user    → permiso delegado para llamar a la API (BFF).
+ * Scopes pedidos SOLO para el login (autenticación).
+ * NO incluir scopes de API aquí — algunos tenants organizacionales
+ * requieren admin consent para API scopes y bloquean el login.
  */
 export const loginRequest = {
-  scopes: [
-    'openid',
-    'profile',
-    `api://${import.meta.env.VITE_API_CLIENT_ID}/access_as_user`,
-  ],
+  scopes: ['openid', 'profile', 'email'],
+};
+
+/**
+ * Scopes para obtener token de acceso a la API (BFF).
+ * Se solicita DESPUÉS del login, al hacer llamadas a la API.
+ */
+export const apiTokenRequest = {
+  scopes: [`api://${import.meta.env.VITE_API_CLIENT_ID}/access_as_user`],
 };
 
 export const msalInstance = new PublicClientApplication(msalConfig);

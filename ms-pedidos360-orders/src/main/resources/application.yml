@@ -41,6 +41,9 @@ spring:
   devtools:
     restart:
       enabled: true
+  rabbitmq:
+    host: localhost
+    port: 5672
 
 ---
 # Perfil docker: contenedor dentro de docker compose
@@ -66,3 +69,6 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${JWT_ISSUER_URI}
+  rabbitmq:
+    host: rabbitmq1
+    port: 5672

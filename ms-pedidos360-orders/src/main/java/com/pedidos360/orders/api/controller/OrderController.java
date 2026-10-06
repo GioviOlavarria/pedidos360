@@ -21,8 +21,28 @@ public class OrderController {
     private OrderService orderService;
 
     @PostMapping
-    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest request) {
-        Order order = orderService.createOrder(request);
+    public ResponseEntity<OrderResponse> createOrder(
+            @Valid @RequestBody OrderRequest request,
+            org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtToken) {
+        
+        String email = "cliente@correo.com";
+        String name = "Cliente " + request.getCustomerId();
+        
+        if (jwtToken != null && jwtToken.getToken() != null) {
+            if (jwtToken.getToken().getClaimAsString("preferred_username") != null) {
+                email = jwtToken.getToken().getClaimAsString("preferred_username");
+            } else if (jwtToken.getToken().getClaimAsString("email") != null) {
+                email = jwtToken.getToken().getClaimAsString("email");
+            } else if (jwtToken.getToken().getClaimAsString("unique_name") != null) {
+                email = jwtToken.getToken().getClaimAsString("unique_name");
+            }
+            
+            if (jwtToken.getToken().getClaimAsString("name") != null) {
+                name = jwtToken.getToken().getClaimAsString("name");
+            }
+        }
+
+        Order order = orderService.createOrder(request, email, name);
         OrderResponse response = mapToResponse(order);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

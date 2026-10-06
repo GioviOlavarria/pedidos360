@@ -1,0 +1,68 @@
+# ── Compilación Maven ────────────────────────────────────────────────────────
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ── Maven Wrapper (el .jar se descarga automáticamente) ──────────────────────
+.mvn/wrapper/maven-wrapper.jar
+
+# ── Variables de entorno y configuración local ───────────────────────────────
+.env
+.env.local
+*.env
+
+# ── Archivos de configuración con secretos (sobreescritura local) ────────────
+src/main/resources/application-local.yml
+src/main/resources/application-local.properties
+src/main/resources/application-dev.yml
+src/main/resources/application-dev.properties
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+log/
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse / STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+# ── Sistema operativo ────────────────────────────────────────────────────────
+
+### Windows ###
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Archivos de prueba temporales ────────────────────────────────────────────
+*.tmp
+*.bak
+*.swp

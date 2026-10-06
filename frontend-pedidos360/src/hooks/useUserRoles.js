@@ -15,15 +15,20 @@ function useUserRoles() {
 
   const account = accounts[0];
   const claims = account?.idTokenClaims;
-  const username = (account?.username || claims?.preferred_username || claims?.email || '').toLowerCase();
-  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'gi.olavarria@duocuc.cl').toLowerCase();
+  const username = (account?.username || '').toLowerCase();
+  const preferredUsername = (claims?.preferred_username || '').toLowerCase();
+  const emailClaim = (claims?.email || '').toLowerCase();
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase();
 
   const tokenRoles = claims?.roles
     ? (Array.isArray(claims.roles) ? claims.roles : [claims.roles])
     : [];
 
+  const matchesAdmin = (str) => adminEmail && str.includes(adminEmail);
   const isAdmin = tokenRoles.includes('Admin') ||
-                  (adminEmail && username === adminEmail);
+                  matchesAdmin(username) ||
+                  matchesAdmin(preferredUsername) ||
+                  matchesAdmin(emailClaim);
 
   if (isAdmin) {
     return ['Admin', 'Operator', 'Customer'];

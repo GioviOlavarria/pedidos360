@@ -19,7 +19,10 @@ public class OrderService {
     @Autowired
     private OrderRepository orderRepository;
 
-    public Order createOrder(com.pedidos360.orders.api.dto.OrderRequest request) {
+    @Autowired
+    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+
+    public Order createOrder(com.pedidos360.orders.api.dto.OrderRequest request, String customerEmail, String customerName) {
         Order order = new Order();
         order.setCustomerId(request.getCustomerId());
         order.setStatus(OrderStatus.CREADO);
@@ -34,7 +37,19 @@ public class OrderService {
             }
         }
         
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+
+        // Send event to RabbitMQ
+        com.pedidos360.orders.api.dto.OrderEvent event = com.pedidos360.orders.api.dto.OrderEvent.builder()
+                .orderId(savedOrder.getId().toString())
+                .customerEmail(customerEmail)
+                .customerName(customerName)
+                .totalAmount(savedOrder.getTotal())
+                .build();
+        
+        rabbitTemplate.convertAndSend("pedidos360.orders.exchange", "pedidos360.orders.routingkey", event);
+
+        return savedOrder;
     }
 
     public Order updateOrder(Long id, com.pedidos360.orders.api.dto.OrderRequest request) {

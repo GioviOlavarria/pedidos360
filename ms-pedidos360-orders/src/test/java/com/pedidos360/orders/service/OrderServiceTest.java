@@ -28,6 +28,9 @@ class OrderServiceTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+
     @InjectMocks
     private OrderService orderService;
 
@@ -97,7 +100,7 @@ class OrderServiceTest {
         // Act
         com.pedidos360.orders.api.dto.OrderRequest request = new com.pedidos360.orders.api.dto.OrderRequest(customerId, total);
         request.setItems(java.util.Collections.emptyList());
-        Order result = orderService.createOrder(request);
+        Order result = orderService.createOrder(request, "test@correo.com", "Test User");
 
         // Assert
         assertNotNull(result);
