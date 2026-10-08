@@ -1,25 +1,27 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMsal } from '@azure/msal-react';
+import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import ProductCard from '../components/ProductCard';
 import ProductForm from '../components/ProductForm';
 import { getProducts, decreaseStock } from '../services/catalogService';
 import { createOrder } from '../services/ordersService';
 import useUserRoles from '../hooks/useUserRoles';
 import { getCustomerIdFromAccount, formatMoney } from '../utils/userUtils';
+import { loginRequest } from '../authConfig';
 
 const NAVY = '#003087';
 const ORANGE = '#FF6B00';
 
 function CatalogPage() {
-  const { accounts } = useMsal();
+  const { accounts, instance } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
   const userRoles = useUserRoles();
   const navigate = useNavigate();
 
-  const isAdmin = userRoles.includes('Admin');
+  const isAdmin = isAuthenticated && userRoles.includes('Admin');
   const account = accounts[0];
-  const customerId = getCustomerIdFromAccount(account);
-  const customerName = account?.name || account?.username || 'Cliente';
+  const customerId = account ? getCustomerIdFromAccount(account) : null;
+  const customerName = account?.name || account?.username || 'Invitado';
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +67,12 @@ function CatalogPage() {
 
   // Manejadores cliente
   const handleStartBuy = (product, quantity) => {
+    if (!isAuthenticated) {
+      if (window.confirm('Para realizar una compra debe iniciar sesión con su cuenta. ¿Desea iniciar sesión ahora?')) {
+        instance.loginRedirect(loginRequest).catch(() => navigate('/login'));
+      }
+      return;
+    }
     setBuyingProduct(product);
     setBuyingQty(quantity);
     setPurchaseSuccessOrder(null);
@@ -113,18 +121,20 @@ function CatalogPage() {
               {isAdmin ? 'Catálogo e Inventario' : 'Catálogo de Productos'}
             </h1>
             <span style={{
-              background: isAdmin ? 'rgba(0,48,135,0.1)' : 'rgba(255,107,0,0.12)',
-              color: isAdmin ? NAVY : ORANGE,
+              background: isAdmin ? 'rgba(0,48,135,0.1)' : (isAuthenticated ? 'rgba(255,107,0,0.12)' : 'rgba(100,116,139,0.12)'),
+              color: isAdmin ? NAVY : (isAuthenticated ? ORANGE : '#475569'),
               fontSize: '0.75rem', fontWeight: '800', padding: '4px 10px', borderRadius: '12px',
               textTransform: 'uppercase', letterSpacing: '0.04em'
             }}>
-              {isAdmin ? 'Vista Administrador' : 'Vista Cliente'}
+              {isAdmin ? 'Vista Administrador' : (isAuthenticated ? 'Vista Cliente' : 'Vista Pública')}
             </span>
           </div>
           <p style={{ color: '#64748b', margin: 0, fontSize: '0.88rem' }}>
             {isAdmin 
               ? 'Administre el inventario, agregue nuevos productos o modifique precios y existencias.'
-              : 'Explore los productos disponibles en la base de datos y realice compras ficticias en tiempo real.'}
+              : (isAuthenticated
+                ? 'Explore los productos disponibles en la base de datos y realice compras ficticias en tiempo real.'
+                : 'Explore nuestro catálogo de productos en tiempo real. Inicie sesión para realizar pedidos.')}
           </p>
         </div>
 
@@ -142,7 +152,7 @@ function CatalogPage() {
           >
             <span>+</span> Nuevo Producto
           </button>
-        ) : (
+        ) : isAuthenticated ? (
           <div style={{
             background: '#fff', border: '1px solid #e2e8f0', padding: '8px 16px',
             borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px',
@@ -154,6 +164,20 @@ function CatalogPage() {
               <div style={{ color: '#64748b' }}>ID Cliente: #{customerId}</div>
             </div>
           </div>
+        ) : (
+          <button
+            onClick={() => instance.loginRedirect(loginRequest).catch(() => navigate('/login'))}
+            style={{
+              background: '#fff', border: `1.5px solid ${ORANGE}`, color: ORANGE,
+              padding: '9px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+              boxShadow: '0 2px 8px rgba(255,107,0,0.15)', transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = ORANGE; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = ORANGE; }}
+          >
+            <span>🔑</span> Iniciar sesión
+          </button>
         )}
       </div>
 

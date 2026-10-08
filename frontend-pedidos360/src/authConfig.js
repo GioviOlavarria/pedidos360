@@ -9,9 +9,9 @@ import { PublicClientApplication } from '@azure/msal-browser';
  */
 export const msalConfig = {
   auth: {
-    clientId:    import.meta.env.VITE_AZURE_AD_CLIENT_ID,
+    clientId:    import.meta.env.VITE_AZURE_AD_CLIENT_ID || 'a88830c8-ace4-45af-8710-18aec6f1c060',
     authority:   'https://login.microsoftonline.com/common/',
-    redirectUri: 'http://localhost:3000/auth/callback',
+    redirectUri: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'http://localhost:3000/auth/callback',
   },
   cache: {
     cacheLocation:        'sessionStorage', // sessionStorage: más seguro que localStorage

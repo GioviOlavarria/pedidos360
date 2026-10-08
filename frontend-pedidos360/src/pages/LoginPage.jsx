@@ -16,7 +16,7 @@ function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const dest = userRoles.includes('Admin') ? '/dashboard' : '/catalog';
+      const dest = userRoles.includes('Admin') ? '/dashboard' : '/';
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, userRoles, navigate]);
@@ -171,6 +171,33 @@ function LoginPage() {
             <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
           </svg>
           Iniciar sesión con Microsoft
+        </button>
+
+        {/* Ver catálogo sin iniciar sesión */}
+        <button
+          type="button"
+          onClick={() => navigate('/catalog')}
+          style={{
+            marginTop: '12px',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '12px 20px',
+            background: '#f8fafc',
+            color: NAVY,
+            border: '1px solid #cbd5e1',
+            borderRadius: '10px',
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+        >
+          <span>👀</span> Ver catálogo sin iniciar sesión
         </button>
 
         {/* Info acceso */}

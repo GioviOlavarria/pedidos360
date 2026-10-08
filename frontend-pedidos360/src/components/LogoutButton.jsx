@@ -4,7 +4,8 @@ function LogoutButton() {
   const { instance } = useMsal();
 
   function handleLogout() {
-    instance.logoutRedirect({ postLogoutRedirectUri: 'http://localhost:3000/login' })
+    const redirectUri = `${window.location.origin}/catalog`;
+    instance.logoutRedirect({ postLogoutRedirectUri: redirectUri })
       .catch(console.error);
   }
 

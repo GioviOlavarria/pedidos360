@@ -22,6 +22,8 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(org.springframework.http.HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/catalog", "/api/catalog/**").permitAll()
+                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/orders/**").permitAll()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

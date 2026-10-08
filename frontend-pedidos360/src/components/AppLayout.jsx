@@ -1,19 +1,20 @@
 import { NavLink } from 'react-router-dom';
-import { useMsal } from '@azure/msal-react';
+import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import useUserRoles from '../hooks/useUserRoles';
 import LogoutButton from './LogoutButton';
+import LoginButton from './LoginButton';
 
 const NAVY  = '#003087';
 const ORANGE = '#FF6B00';
 
 function AppLayout({ children }) {
-  const { accounts } = useMsal();
+  const { accounts, instance } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
   const userRoles = useUserRoles();
 
-  const userName      = accounts[0]?.name ?? accounts[0]?.username ?? 'Usuario';
+  const userName      = accounts[0]?.name ?? accounts[0]?.username ?? 'Invitado';
   const userInitial   = userName.charAt(0).toUpperCase();
-  const isAdmin       = userRoles.includes('Admin');
-  const isCustomer    = !isAdmin && userRoles.includes('Customer');
+  const isAdmin       = isAuthenticated && userRoles.includes('Admin');
 
   return (
     <div style={{
@@ -55,7 +56,7 @@ function AppLayout({ children }) {
               Pedidos<span style={{ color: ORANGE }}>360</span>
             </span>
             <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {isAdmin ? 'Panel Administrador' : 'Portal Cliente'}
+              {isAuthenticated ? (isAdmin ? 'Panel Administrador' : 'Portal Cliente') : 'Catálogo Público'}
             </span>
           </div>
         </div>
@@ -70,55 +71,119 @@ function AppLayout({ children }) {
             Menú {isAdmin ? 'Administrativo' : 'Principal'}
           </p>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {isAdmin && (
-              <NavItem to="/dashboard" icon="🏠" label="Panel principal" end />
-            )}
-            <NavItem 
-              to="/catalog" 
-              icon={isAdmin ? "🗂️" : "🛍️"} 
-              label={isAdmin ? "Catálogo e Inventario" : "Catálogo y Tienda"} 
-            />
-            <NavItem 
-              to="/orders" 
-              icon="📦" 
-              label={isAdmin ? "Gestión de Pedidos" : "Mis Pedidos"} 
-            />
-            {isAdmin && (
-              <NavItem to="/reports" icon="📊" label="Reportes Financieros" />
+            {isAdmin ? (
+              <>
+                <NavItem to="/dashboard" icon="🏠" label="Panel principal" end />
+                <NavItem to="/catalog" icon="🗂️" label="Catálogo e Inventario" />
+                <NavItem to="/orders" icon="📦" label="Gestión de Pedidos" />
+                <NavItem to="/reports" icon="📊" label="Reportes Financieros" />
+              </>
+            ) : (
+              <>
+                <NavItem to="/" icon="🏠" label="Inicio" end />
+                <NavItem to="/catalog" icon="🛍️" label="Catálogo de Productos" />
+                {isAuthenticated && (
+                  <NavItem to="/orders" icon="📦" label="Mis Pedidos" />
+                )}
+                <NavItem to="/tracking" icon="🔍" label="Seguimiento de Envíos" />
+                {!isAuthenticated && (
+                  <li style={{ marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        import('../authConfig').then(({ loginRequest }) => {
+                          instance.loginRedirect(loginRequest).catch(() => window.location.assign('/login'));
+                        });
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '10px 12px', borderRadius: '8px',
+                        border: '1px solid rgba(255,107,0,0.4)',
+                        background: 'rgba(255,107,0,0.15)',
+                        color: '#fff',
+                        fontWeight: '600',
+                        fontSize: '0.88rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,107,0,0.28)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,107,0,0.15)'; }}
+                    >
+                      <span style={{ fontSize: '1rem' }}>🔐</span>
+                      Iniciar sesión
+                    </button>
+                  </li>
+                )}
+              </>
             )}
           </ul>
         </nav>
 
-        {/* Usuario + logout */}
+        {/* Usuario + login/logout en panel de opciones */}
         <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              background: isAdmin ? ORANGE : '#10b981',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.9rem', fontWeight: '800', color: '#fff', flexShrink: 0,
-            }}>
-              {userInitial}
-            </div>
-            <div style={{ overflow: 'hidden', flex: 1 }}>
-              <div style={{
-                fontSize: '0.82rem', fontWeight: '600', color: '#fff',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {userName}
+          {isAuthenticated ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: isAdmin ? ORANGE : '#10b981',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.9rem', fontWeight: '800', color: '#fff', flexShrink: 0,
+                }}>
+                  {userInitial}
+                </div>
+                <div style={{ overflow: 'hidden', flex: 1 }}>
+                  <div style={{
+                    fontSize: '0.82rem', fontWeight: '600', color: '#fff',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {userName}
+                  </div>
+                  <div style={{
+                    fontSize: '0.68rem', 
+                    color: isAdmin ? ORANGE : '#34d399', 
+                    fontWeight: '700',
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.04em',
+                  }}>
+                    {isAdmin ? 'ADMINISTRADOR' : 'CLIENTE'}
+                  </div>
+                </div>
               </div>
-              <div style={{
-                fontSize: '0.68rem', 
-                color: isAdmin ? ORANGE : '#34d399', 
-                fontWeight: '700',
-                textTransform: 'uppercase', 
-                letterSpacing: '0.04em',
-              }}>
-                {isAdmin ? 'ADMINISTRADOR' : 'CLIENTE'}
+              <LogoutButton />
+            </>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.12)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1rem', color: '#fff', flexShrink: 0,
+                }}>
+                  👤
+                </div>
+                <div style={{ overflow: 'hidden', flex: 1 }}>
+                  <div style={{
+                    fontSize: '0.82rem', fontWeight: '600', color: '#fff',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    Modo Invitado
+                  </div>
+                  <div style={{
+                    fontSize: '0.68rem', 
+                    color: 'rgba(255,255,255,0.45)', 
+                    fontWeight: '500',
+                  }}>
+                    Sin sesión activa
+                  </div>
+                </div>
               </div>
+              <LoginButton />
             </div>
-          </div>
-          <LogoutButton />
+          )}
         </div>
       </aside>
 
