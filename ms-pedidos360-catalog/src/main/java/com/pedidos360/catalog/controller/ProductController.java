@@ -5,6 +5,7 @@ import com.pedidos360.catalog.dto.ProductResponse;
 import com.pedidos360.catalog.entity.Product;
 import com.pedidos360.catalog.service.ProductService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -54,7 +55,7 @@ public class ProductController {
 
     @PatchMapping("/{id}/stock")
     public ResponseEntity<Void> decreaseStock(@PathVariable Long id,
-                                              @RequestParam Integer quantity) {
+                                              @RequestParam @Positive Integer quantity) {
         productService.decreaseStock(id, quantity);
         return ResponseEntity.noContent().build();
     }

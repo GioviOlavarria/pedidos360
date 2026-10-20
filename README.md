@@ -2,8 +2,8 @@
 
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=java)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?logo=spring-boot)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
 ![Azure AD](https://img.shields.io/badge/Azure_Active_Directory-0078D4?logo=microsoft-azure)
 
@@ -67,27 +67,58 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
    ```bash
    docker compose up --build -d
    ```
-   Este proceso descargará las imágenes base, compilará el código fuente (Java y React) en paralelo, y levantará 5 contenedores en la red `pedidos360-net`.
+   Este proceso descargará las imágenes base, compilará el código fuente (Java y React) en paralelo, y levantará todos los contenedores (MySQL, cluster RabbitMQ de 3 nodos, MailHog, 4 microservicios y el frontend) en la red `pedidos360-net`.
 
 4. **Accede a la plataforma**:
    - Plataforma web (Frontend): `http://localhost:3000`
    - Inicia sesión con tu cuenta de Microsoft.
+   - Bandeja de correos de prueba (boletas): `http://localhost:8025`
 
 ---
 
-## Roles y Permisos (Azure AD)
-La aplicación maneja 3 roles corporativos que deben ser definidos en el registro de tu aplicación en **Microsoft Entra ID**:
-- **Admin**: Acceso total. Visualiza reportes financieros exclusivos, gestiona catálogo completo, y modifica/crea órdenes.
-- **Operator**: Puede visualizar, cambiar estados de pedidos y ver/modificar catálogo de productos.
-- **Customer**: Sólo puede visualizar/crear pedidos.
+## Roles y Permisos
 
-> Para asignar un rol a un usuario, hazlo desde *Azure Portal > Entra ID > Aplicaciones Empresariales > [Tu App Frontend] > Usuarios y Grupos*.
+Se puede iniciar sesión con **cualquier cuenta de Microsoft** (corporativa, institucional o personal):
+
+- **Admin**: los correos definidos en `ADMIN_EMAILS` (por defecto `gi.olavarria@duocuc.cl`). Entra directo al panel de administración: catálogo, gestión de pedidos y reportes.
+- **Customer**: cualquier otra cuenta. Puede comprar (compras ficticias), ver sus propios pedidos y recibe la boleta por correo.
+- Sin sesión se puede ver el catálogo y hacer seguimiento por número de pedido, pero **no comprar**.
+
+El rol lo decide el **backend** a partir del token (claim `preferred_username`/`email`). El frontend solo lo usa para mostrar las pantallas, así que no se puede "hacerse admin" desde el navegador. También se respetan los App Roles `Admin`/`Operator` de Azure si se asignan.
+
+### Configuración requerida en Azure (Entra ID)
+
+1. **App Registration de la API** (`API_CLIENT_ID`):
+   - *Supported account types*: "Accounts in any organizational directory and personal Microsoft accounts".
+   - *Expose an API*: scope `access_as_user`, y agregar el client id del frontend como *Authorized client application*.
+   - *Manifest*: `"requestedAccessTokenVersion": 2` (obligatorio para cuentas personales).
+   - *Token configuration*: agregar los optional claims `email` y `preferred_username` al **access token** (el backend los usa para saber quién compra, a qué correo enviar la boleta y si es Admin).
+2. **App Registration del frontend** (`AZURE_AD_CLIENT_ID`): mismo tipo de cuentas, plataforma *SPA* con redirect URI `http://localhost:3000/auth/callback` (y `http://localhost:5173/auth/callback` para desarrollo con Vite), y permiso delegado al scope `access_as_user` de la API.
+
+El backend valida que cada token haya sido emitido **para esta API** (`aud`) por el tenant indicado en el propio token (`tid`/`iss`).
+
+## Flujo de compra y boleta (RabbitMQ)
+
+```text
+Cliente compra ──> BFF ──> orders ──(reserva stock, precios reales)──> catalog
+                             │
+                             └─ tras guardar el pedido publica "order.created"
+                                         │
+                        RabbitMQ (cluster 3 nodos, cola quorum)
+                                         │
+                                  notifications ──> correo con la boleta (SMTP)
+```
+
+- El total y los precios se calculan en el servidor con los datos del catálogo; el stock se descuenta de forma atómica.
+- Si el envío del correo falla, se reintenta 4 veces y luego el mensaje queda en `pedidos360.notifications.boleta.dlq`.
+- Por defecto los correos van a **MailHog**: ábrelos en `http://localhost:8025`. Para enviar correos reales, configura las variables `MAIL_*` en `infra/.env` (ver `infra/.env.example`).
+- Panel de RabbitMQ: `http://localhost:15672` (usuario/clave `RABBITMQ_USER` / `RABBITMQ_PASSWORD`).
 
 ## Tecnologías Utilizadas
 
 ### Frontend
-* React 18, React Router DOM v7
-* Vite 5, Axios
+* React 19, React Router DOM v7
+* Vite 8, Axios
 * @azure/msal-browser, @azure/msal-react (Auth)
 * Nginx (Web server en Docker)
 

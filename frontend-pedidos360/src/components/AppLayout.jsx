@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import useUserRoles from '../hooks/useUserRoles';
 import LogoutButton from './LogoutButton';
@@ -8,7 +8,8 @@ const NAVY  = '#003087';
 const ORANGE = '#FF6B00';
 
 function AppLayout({ children }) {
-  const { accounts, instance } = useMsal();
+  const { accounts } = useMsal();
+  const navigate = useNavigate();
   const isAuthenticated = useIsAuthenticated();
   const userRoles = useUserRoles();
 
@@ -90,11 +91,7 @@ function AppLayout({ children }) {
                   <li style={{ marginTop: '8px' }}>
                     <button
                       type="button"
-                      onClick={() => {
-                        import('../authConfig').then(({ loginRequest }) => {
-                          instance.loginRedirect(loginRequest).catch(() => window.location.assign('/login'));
-                        });
-                      }}
+                      onClick={() => navigate('/login')}
                       style={{
                         width: '100%',
                         display: 'flex', alignItems: 'center', gap: '10px',

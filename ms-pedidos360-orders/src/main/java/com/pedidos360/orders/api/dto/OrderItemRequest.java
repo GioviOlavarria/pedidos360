@@ -12,8 +12,7 @@ public class OrderItemRequest {
     @Positive(message = "quantity debe ser positivo")
     private Integer quantity;
 
-    @NotNull(message = "unitPrice no puede ser nulo")
-    @Positive(message = "unitPrice debe ser positivo")
+    /** Informativo: se ignora, el precio vigente lo entrega el catálogo. */
     private BigDecimal unitPrice;
 
     public OrderItemRequest() {}

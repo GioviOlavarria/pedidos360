@@ -14,19 +14,12 @@ management:
     health:
       show-details: when-authorized
 
----
-# Perfil local: desarrollo directo en la máquina (sin Docker)
-spring:
-  config:
-    activate:
-      on-profile: local
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${JWT_ISSUER_URI}
-
 app:
+  security:
+    # App Registration de la API. El token debe tener aud = este client id.
+    api-client-id: ${API_CLIENT_ID:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   services:
     orders:
       url: ${ORDERS_SERVICE_URL:http://localhost:8081}
@@ -39,11 +32,6 @@ spring:
   config:
     activate:
       on-profile: docker
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${JWT_ISSUER_URI}
 
 app:
   services:

@@ -7,6 +7,7 @@ public class OrderItemResponse {
     private Long productId;
     private Integer quantity;
     private BigDecimal unitPrice;
+    private String productName;
 
     public OrderItemResponse() {}
 
@@ -21,4 +22,7 @@ public class OrderItemResponse {
 
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+
+    public String getProductName() { return productName; }
+    public void setProductName(String productName) { this.productName = productName; }
 }

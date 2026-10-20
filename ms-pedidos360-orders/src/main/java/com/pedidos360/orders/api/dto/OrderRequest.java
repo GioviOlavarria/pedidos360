@@ -1,5 +1,7 @@
 package com.pedidos360.orders.api.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
@@ -10,11 +12,11 @@ public class OrderRequest {
     @Positive(message = "customerId debe ser positivo")
     private Long customerId;
 
-    @NotNull(message = "total no puede ser nulo")
-    @Positive(message = "total debe ser positivo")
+    /** Informativo: el total real se calcula en el servidor con los precios del catálogo. */
     private BigDecimal total;
 
-    private java.util.List<OrderItemRequest> items;
+    @NotEmpty(message = "el pedido debe tener al menos un producto")
+    private java.util.List<@Valid OrderItemRequest> items;
 
     public OrderRequest() {
     }

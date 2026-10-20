@@ -14,6 +14,20 @@ management:
     health:
       show-details: when-authorized
 
+app:
+  security:
+    # App Registration de la API (BFF). El token debe tener aud = este client id.
+    api-client-id: ${API_CLIENT_ID:}
+    # Correos (separados por coma) que entran con rol Admin. El resto es Customer.
+    admin-emails: ${ADMIN_EMAILS:gi.olavarria@duocuc.cl}
+    # Opcional: exigir además que el Admin pertenezca a este tenant (recomendado).
+    admin-tenant-id: ${ADMIN_TENANT_ID:}
+  internal:
+    # Clave compartida para llamadas servicio a servicio (orders -> catalog).
+    api-key: ${INTERNAL_API_KEY:}
+  catalog:
+    seed-sample-data: ${CATALOG_SEED:true}
+
 ---
 # Perfil local: desarrollo directo en la máquina (sin Docker)
 spring:
@@ -21,7 +35,7 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    url: ${DB_URL:jdbc:mysql://localhost:3307/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -29,15 +43,8 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
+    open-in-view: false
     database-platform: org.hibernate.dialect.MySQLDialect
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${JWT_ISSUER_URI}
   devtools:
     restart:
       enabled: true
@@ -57,12 +64,5 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
+    open-in-view: false
     database-platform: org.hibernate.dialect.MySQLDialect
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${JWT_ISSUER_URI}

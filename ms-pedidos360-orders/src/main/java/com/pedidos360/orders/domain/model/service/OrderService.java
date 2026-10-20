@@ -1,101 +1,192 @@
 package com.pedidos360.orders.domain.model.service;
 
+import com.pedidos360.orders.api.dto.OrderItemRequest;
+import com.pedidos360.orders.api.dto.OrderRequest;
+import com.pedidos360.orders.client.CatalogClient;
+import com.pedidos360.orders.client.CatalogClient.ReservedItem;
+import com.pedidos360.orders.client.CatalogClient.StockItem;
 import com.pedidos360.orders.domain.model.Order;
+import com.pedidos360.orders.domain.model.OrderItem;
 import com.pedidos360.orders.domain.model.OrderStatus;
 import com.pedidos360.orders.domain.model.exception.InvalidOrderStateException;
+import com.pedidos360.orders.domain.model.exception.OrderNotFoundException;
+import com.pedidos360.orders.messaging.OrderCreatedEvent;
 import com.pedidos360.orders.repository.OrderRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional
 public class OrderService {
 
-    @Autowired
-    private OrderRepository orderRepository;
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
-    @Autowired
-    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+    /** Estados en que la mercadería aún está en bodega: eliminar el pedido devuelve el stock. */
+    private static final Set<OrderStatus> STOCK_IN_WAREHOUSE =
+            EnumSet.of(OrderStatus.CREADO, OrderStatus.ACEPTADO, OrderStatus.EN_PREPARACION);
 
-    public Order createOrder(com.pedidos360.orders.api.dto.OrderRequest request, String customerEmail, String customerName) {
-        Order order = new Order();
-        order.setCustomerId(request.getCustomerId());
-        order.setStatus(OrderStatus.CREADO);
-        order.setCreatedAt(LocalDateTime.now());
-        order.setTotal(request.getTotal());
-        
-        if (request.getItems() != null) {
-            for (com.pedidos360.orders.api.dto.OrderItemRequest itemReq : request.getItems()) {
-                com.pedidos360.orders.domain.model.OrderItem item = new com.pedidos360.orders.domain.model.OrderItem(
-                    itemReq.getProductId(), itemReq.getQuantity(), itemReq.getUnitPrice());
-                order.addItem(item);
-            }
-        }
-        
-        Order savedOrder = orderRepository.save(order);
+    /** Estados en que el Admin todavía puede modificar los productos del pedido. */
+    private static final Set<OrderStatus> EDITABLE = EnumSet.of(OrderStatus.CREADO, OrderStatus.ACEPTADO);
 
-        // Send event to RabbitMQ
-        com.pedidos360.orders.api.dto.OrderEvent event = com.pedidos360.orders.api.dto.OrderEvent.builder()
-                .orderId(savedOrder.getId().toString())
-                .customerEmail(customerEmail)
-                .customerName(customerName)
-                .totalAmount(savedOrder.getTotal())
-                .build();
-        
-        rabbitTemplate.convertAndSend("pedidos360.orders.exchange", "pedidos360.orders.routingkey", event);
+    private final OrderRepository orderRepository;
+    private final CatalogClient catalogClient;
+    private final ApplicationEventPublisher eventPublisher;
 
-        return savedOrder;
+    public OrderService(OrderRepository orderRepository, CatalogClient catalogClient,
+                        ApplicationEventPublisher eventPublisher) {
+        this.orderRepository = orderRepository;
+        this.catalogClient = catalogClient;
+        this.eventPublisher = eventPublisher;
     }
 
-    public Order updateOrder(Long id, com.pedidos360.orders.api.dto.OrderRequest request) {
-        Order order = findById(id);
+    /**
+     * Crea un pedido: reserva stock en el catálogo (que entrega los precios vigentes), calcula el
+     * total en el servidor, guarda el pedido y deja programado el evento para la boleta por correo.
+     */
+    public Order createOrder(OrderRequest request, CurrentUser user) {
+        List<StockItem> stockItems = toStockItems(request.getItems());
+        List<ReservedItem> reserved = catalogClient.reserve(stockItems);
+
+        Order order = new Order();
         order.setCustomerId(request.getCustomerId());
-        order.setTotal(request.getTotal());
-        
-        order.getItems().clear();
-        
-        if (request.getItems() != null) {
-            for (com.pedidos360.orders.api.dto.OrderItemRequest itemReq : request.getItems()) {
-                com.pedidos360.orders.domain.model.OrderItem item = new com.pedidos360.orders.domain.model.OrderItem(
-                    itemReq.getProductId(), itemReq.getQuantity(), itemReq.getUnitPrice());
-                order.addItem(item);
-            }
+        order.setCustomerEmail(user.email());
+        order.setCustomerName(user.name());
+        order.setStatus(OrderStatus.CREADO);
+        order.setCreatedAt(LocalDateTime.now());
+        applyItems(order, reserved);
+
+        Order saved;
+        try {
+            saved = orderRepository.saveAndFlush(order);
+        } catch (RuntimeException e) {
+            releaseQuietly(stockItems);
+            throw e;
         }
-        
-        return orderRepository.save(order);
+
+        eventPublisher.publishEvent(toEvent(saved));
+        return saved;
+    }
+
+    public Order updateOrder(Long id, OrderRequest request) {
+        Order order = findById(id);
+        if (!EDITABLE.contains(order.getStatus())) {
+            throw new InvalidOrderStateException(
+                    "Solo se pueden editar pedidos en estado CREADO o ACEPTADO (actual: " + order.getStatus() + ")");
+        }
+
+        List<StockItem> previous = itemsOf(order);
+        List<StockItem> requested = toStockItems(request.getItems());
+
+        // Devolver primero el stock anterior para que la nueva reserva vea el stock completo.
+        catalogClient.release(previous);
+        List<ReservedItem> reserved;
+        try {
+            reserved = catalogClient.reserve(requested);
+        } catch (RuntimeException e) {
+            reserveQuietly(previous);
+            throw e;
+        }
+
+        order.setCustomerId(request.getCustomerId());
+        order.getItems().clear();
+        applyItems(order, reserved);
+        try {
+            return orderRepository.saveAndFlush(order);
+        } catch (RuntimeException e) {
+            releaseQuietly(requested);
+            reserveQuietly(previous);
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
-    public List<Order> findAll() {
-        return orderRepository.findAll();
-    }
-
-    public void deleteOrder(Long id) {
-        if (!orderRepository.existsById(id)) {
-            throw new IllegalArgumentException("Order no encontrada: " + id);
+    public List<Order> findAllFor(CurrentUser user) {
+        if (user.canManageAllOrders()) {
+            return orderRepository.findAllByOrderByCreatedAtDesc();
         }
-        orderRepository.deleteById(id);
+        if (user.email() == null) {
+            return List.of();
+        }
+        return orderRepository.findByCustomerEmailIgnoreCaseOrderByCreatedAtDesc(user.email());
     }
 
     @Transactional(readOnly = true)
     public Order findById(Long id) {
-        return orderRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Order no encontrada: " + id));
+        return orderRepository.findById(id).orElseThrow(() -> new OrderNotFoundException(id));
+    }
+
+    public void deleteOrder(Long id) {
+        Order order = findById(id);
+        if (STOCK_IN_WAREHOUSE.contains(order.getStatus())) {
+            catalogClient.release(itemsOf(order));
+        }
+        orderRepository.delete(order);
     }
 
     public Order changeStatus(Long orderId, OrderStatus nuevoEstado) {
         Order order = findById(orderId);
-        OrderStatus estadoActual = order.getStatus();
+        validateStateTransition(order.getStatus(), nuevoEstado);
 
-        validateStateTransition(estadoActual, nuevoEstado);
+        if (nuevoEstado == OrderStatus.CANCELADO) {
+            catalogClient.release(itemsOf(order));
+        }
 
         order.setStatus(nuevoEstado);
         return orderRepository.save(order);
+    }
+
+    private void applyItems(Order order, List<ReservedItem> reserved) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (ReservedItem r : reserved) {
+            order.addItem(new OrderItem(r.productId(), r.name(), r.quantity(), r.unitPrice()));
+            total = total.add(r.unitPrice().multiply(BigDecimal.valueOf(r.quantity())));
+        }
+        order.setTotal(total);
+    }
+
+    private static List<StockItem> toStockItems(List<OrderItemRequest> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("El pedido debe tener al menos un producto");
+        }
+        return items.stream().map(i -> new StockItem(i.getProductId(), i.getQuantity())).toList();
+    }
+
+    private static List<StockItem> itemsOf(Order order) {
+        return order.getItems().stream().map(i -> new StockItem(i.getProductId(), i.getQuantity())).toList();
+    }
+
+    private void releaseQuietly(List<StockItem> items) {
+        try {
+            catalogClient.release(items);
+        } catch (RuntimeException e) {
+            log.error("No se pudo devolver stock {} tras un error: {}", items, e.getMessage());
+        }
+    }
+
+    private void reserveQuietly(List<StockItem> items) {
+        try {
+            catalogClient.reserve(items);
+        } catch (RuntimeException e) {
+            log.error("No se pudo restaurar la reserva de stock {}: {}", items, e.getMessage());
+        }
+    }
+
+    private static OrderCreatedEvent toEvent(Order order) {
+        List<OrderCreatedEvent.Item> items = order.getItems().stream()
+                .map(i -> new OrderCreatedEvent.Item(i.getProductId(), i.getProductName(), i.getQuantity(),
+                        i.getUnitPrice(), i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity()))))
+                .toList();
+        return new OrderCreatedEvent(order.getId(), order.getCustomerEmail(), order.getCustomerName(),
+                order.getCreatedAt(), order.getTotal(), items);
     }
 
     private void validateStateTransition(OrderStatus estadoActual, OrderStatus nuevoEstado) {

@@ -11,6 +11,7 @@ public class OrderResponse {
     private OrderStatus status;
     private LocalDateTime createdAt;
     private BigDecimal total;
+    private String customerName;
     private java.util.List<OrderItemResponse> items;
 
     public OrderResponse() {
@@ -62,6 +63,14 @@ public class OrderResponse {
 
     public void setTotal(BigDecimal total) {
         this.total = total;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
     }
 
     public java.util.List<OrderItemResponse> getItems() {

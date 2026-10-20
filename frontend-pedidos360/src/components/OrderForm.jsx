@@ -76,13 +76,12 @@ function OrderForm({ onClose, onCreated, initialOrder }) {
       if (initialOrder) {
         await updateOrder(initialOrder.id, payload);
       } else {
+        // El backend descuenta el stock al crear el pedido.
         await createOrder(payload);
-        const { decreaseStock } = await import('../services/catalogService');
-        await Promise.all(items.map(i => decreaseStock(i.product.id, i.quantity)));
       }
       onCreated();
     } catch (err) {
-      setError(`Error al ${initialOrder ? 'actualizar' : 'crear'} el pedido.`);
+      setError(err?.response?.data?.message || `Error al ${initialOrder ? 'actualizar' : 'crear'} el pedido.`);
     } finally {
       setLoading(false);
     }

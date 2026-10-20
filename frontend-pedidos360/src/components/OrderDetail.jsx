@@ -75,7 +75,7 @@ function OrderDetail({ orderId, onStatusChanged, onEdit }) {
         setOrder(prev => ({ ...prev, status: newStatus }));
         if (onStatusChanged) onStatusChanged();
       })
-      .catch(() => alert('Error al cambiar el estado del pedido. Verifique la regla de transición de estados.'));
+      .catch((err) => alert(err?.response?.data?.message || 'Error al cambiar el estado del pedido. Verifique la regla de transición de estados.'));
   };
 
   const nextStatus = NEXT_STATUS[order.status];

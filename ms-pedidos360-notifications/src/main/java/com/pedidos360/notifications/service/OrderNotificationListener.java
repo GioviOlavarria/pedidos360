@@ -1,47 +1,42 @@
 package com.pedidos360.notifications.service;
 
 import com.pedidos360.notifications.config.RabbitMQConfig;
-import com.pedidos360.notifications.model.OrderEvent;
+import com.pedidos360.notifications.model.OrderCreatedEvent;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 
+/**
+ * Consume los eventos "pedido creado" y envía la boleta por correo.
+ * Si el envío falla, la excepción se propaga: Spring reintenta (ver spring.rabbitmq.listener.simple.retry)
+ * y, agotados los reintentos, el mensaje pasa a la cola DLQ en lugar de perderse.
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class OrderNotificationListener {
 
-    private final JavaMailSender mailSender;
+    private final BoletaMailService boletaMailService;
 
-    @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME)
-    public void handleOrderEvent(OrderEvent orderEvent) {
-        log.info("Recibido evento de orden: {}", orderEvent);
-        sendEmailReceipt(orderEvent);
-    }
+    @RabbitListener(queues = RabbitMQConfig.QUEUE_BOLETA)
+    public void handleOrderCreated(OrderCreatedEvent event) throws MessagingException {
+        log.info("Recibido evento de pedido #{} para {}", event.orderId(), event.customerEmail());
 
-    private void sendEmailReceipt(OrderEvent orderEvent) {
-        log.info("Enviando boleta al correo: {}", orderEvent.getCustomerEmail());
-        
+        if (event.customerEmail() == null || !event.customerEmail().contains("@")) {
+            // Reintentar no lo arreglaría: va directo a la DLQ.
+            throw new AmqpRejectAndDontRequeueException("Pedido #" + event.orderId() + " sin correo de destino");
+        }
+
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("noreply@pedidos360.com");
-            message.setTo(orderEvent.getCustomerEmail());
-            message.setSubject("Boleta de su compra - Orden #" + orderEvent.getOrderId());
-            message.setText("Estimado/a " + orderEvent.getCustomerName() + ",\n\n" +
-                    "Gracias por su compra en Pedidos360.\n\n" +
-                    "Detalles de la orden:\n" +
-                    "ID de Orden: " + orderEvent.getOrderId() + "\n" +
-                    "Total a pagar: $" + orderEvent.getTotalAmount() + "\n\n" +
-                    "Si tiene alguna duda, puede contactarnos.\n" +
-                    "Saludos,\nEl equipo de Pedidos360");
-            
-            mailSender.send(message);
-            log.info("Correo enviado exitosamente a {}", orderEvent.getCustomerEmail());
-        } catch (Exception e) {
-            log.error("Error al enviar el correo a {}: {}", orderEvent.getCustomerEmail(), e.getMessage());
+            boletaMailService.sendBoleta(event);
+            log.info("Boleta del pedido #{} enviada a {}", event.orderId(), event.customerEmail());
+        } catch (MailException | MessagingException e) {
+            log.warn("Fallo al enviar la boleta del pedido #{} a {}: {}", event.orderId(), event.customerEmail(), e.getMessage());
+            throw e;
         }
     }
 }

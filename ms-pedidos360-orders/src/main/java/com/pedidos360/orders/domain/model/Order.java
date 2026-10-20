@@ -2,14 +2,14 @@ package com.pedidos360.orders.domain.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = @Index(name = "idx_orders_customer_email", columnList = "customer_email"))
 public class Order {
 
     @Id
@@ -30,9 +30,16 @@ public class Order {
     private LocalDateTime createdAt;
 
     @NotNull
-    @Positive
+    @PositiveOrZero
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
+
+    /** Correo del comprador (tomado del token de Azure AD), destino de la boleta. */
+    @Column(name = "customer_email", length = 320)
+    private String customerEmail;
+
+    @Column(name = "customer_name")
+    private String customerName;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> items = new ArrayList<>();
@@ -85,6 +92,22 @@ public class Order {
 
     public void setTotal(BigDecimal total) {
         this.total = total;
+    }
+
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
     }
 
     public List<OrderItem> getItems() {

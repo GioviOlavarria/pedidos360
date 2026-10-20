@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
-import { loginRequest } from '../authConfig';
+import { loginRequest, institutionalLoginRequest, consumeAuthError } from '../authConfig';
 import useUserRoles from '../hooks/useUserRoles';
 
 /* ── Paleta Blue Express-inspired ───────────────────────────────────────── */
@@ -13,6 +13,7 @@ function LoginPage() {
   const isAuthenticated = useIsAuthenticated();
   const navigate = useNavigate();
   const userRoles = useUserRoles();
+  const [authError] = useState(() => consumeAuthError());
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -139,6 +140,18 @@ function LoginPage() {
           </p>
         </div>
 
+        {authError && (
+          <div style={{
+            marginBottom: '20px', padding: '12px 14px', borderRadius: '10px',
+            background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c',
+            fontSize: '0.8rem', lineHeight: 1.5, wordBreak: 'break-word',
+          }}>
+            <strong>No se pudo iniciar sesión.</strong><br />
+            {authError}<br />
+            Si usa una cuenta institucional (Duoc), ingrese con el enlace "¿Cuenta institucional?".
+          </div>
+        )}
+
         {/* Divider */}
         <div style={{ borderTop: '1px solid #f1f5f9', marginBottom: '28px' }} />
 
@@ -198,6 +211,24 @@ function LoginPage() {
           onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
         >
           <span>👀</span> Ver catálogo sin iniciar sesión
+        </button>
+
+        {/* Cuentas institucionales: inician sesión como invitadas del tenant */}
+        <button
+          type="button"
+          onClick={() => instance.loginRedirect(institutionalLoginRequest).catch(console.error)}
+          style={{
+            marginTop: '14px',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            color: NAVY,
+            fontSize: '0.82rem',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+        >
+          ¿Cuenta institucional (Duoc)? Ingresa aquí
         </button>
 
         {/* Info acceso */}

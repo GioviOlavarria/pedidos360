@@ -1,25 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
-import { getProducts, decreaseStock } from '../services/catalogService';
+import { getProducts } from '../services/catalogService';
 import { getOrderById, createOrder } from '../services/ordersService';
-import { formatMoney, getCustomerIdFromAccount } from '../utils/userUtils';
-import { loginRequest } from '../authConfig';
+import { formatMoney, getCustomerIdFromAccount, apiErrorMessage } from '../utils/userUtils';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import useUserRoles from '../hooks/useUserRoles';
 
 const NAVY = '#003087';
 const ORANGE = '#FF6B00';
-
-// Productos de muestra para garantizar experiencia visual inmediata si el catálogo está vacío
-const SAMPLE_PRODUCTS = [
-  { id: 101, name: 'Caja Embalaje Reforzada 40x30x25', description: 'Caja de cartón corrugado doble para envíos seguros y resistentes.', price: 2990, stock: 45 },
-  { id: 102, name: 'Cinta Adhesiva de Embalaje Industrial', description: 'Cinta de polipropileno resistente para sellado hermético de encomiendas.', price: 1490, stock: 120 },
-  { id: 103, name: 'Rollo Plástico Burbuja 50cm x 10m', description: 'Protección acolchada contra impactos para productos frágiles y delicados.', price: 4990, stock: 32 },
-  { id: 104, name: 'Etiquetas Autoadhesivas Térmicas 100x150', description: 'Rollo de 500 etiquetas para rotulación logística y guías de despacho.', price: 6990, stock: 18 },
-  { id: 105, name: 'Sobre Acolchado Kraft A4 con Burbuja', description: 'Sobre de seguridad para documentos y piezas pequeñas con cierre adhesivo.', price: 990, stock: 85 },
-  { id: 106, name: 'Dispensador Manual de Cinta de Embalar', description: 'Aplicador ergonómico metálico con cuchilla dentada retráctil.', price: 8490, stock: 14 },
-];
 
 // Pasos del flujo de seguimiento logístico
 const TRACKING_STEPS = [
@@ -31,7 +20,7 @@ const TRACKING_STEPS = [
 ];
 
 function HomePage() {
-  const { accounts, instance } = useMsal();
+  const { accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const userRoles = useUserRoles();
   const navigate = useNavigate();
@@ -70,17 +59,8 @@ function HomePage() {
   const loadProducts = useCallback(() => {
     setLoadingProducts(true);
     getProducts()
-      .then((res) => {
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          setProducts(res.data);
-        } else {
-          setProducts(SAMPLE_PRODUCTS);
-        }
-      })
-      .catch(() => {
-        // En caso de que el backend esté desconectado en desarrollo
-        setProducts(SAMPLE_PRODUCTS);
-      })
+      .then((res) => setProducts(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setProducts([]))
       .finally(() => setLoadingProducts(false));
   }, []);
 
@@ -109,7 +89,7 @@ function HomePage() {
     const { product, quantity } = selectedProductForModal;
 
     if (!isAuthenticated) {
-      instance.loginRedirect(loginRequest).catch(() => navigate('/login'));
+      navigate('/login');
       return;
     }
 
@@ -127,22 +107,12 @@ function HomePage() {
     };
 
     try {
+      // El backend valida precio y stock, descuenta el inventario y envía la boleta por correo.
       const res = await createOrder(payload);
-      try {
-        await decreaseStock(product.id, quantity);
-      } catch {
-        // Continuar si backend maneja stock independientemente
-      }
-      setPurchaseSuccess(res.data || { id: Math.floor(Math.random() * 900) + 100, total: payload.total });
+      setPurchaseSuccess(res.data);
       loadProducts();
-    } catch {
-      // Simular pedido exitoso para entorno de pruebas si el backend de órdenes no responde
-      setPurchaseSuccess({
-        id: Math.floor(Math.random() * 900) + 100,
-        customerId: customerId,
-        total: payload.total,
-        status: 'CREADO',
-      });
+    } catch (err) {
+      alert(apiErrorMessage(err, 'No se pudo registrar la compra. Intente nuevamente.'));
     } finally {
       setPurchasing(false);
       setSelectedProductForModal(null);
@@ -168,23 +138,10 @@ function HomePage() {
       } else {
         throw new Error('No encontrado');
       }
-    } catch {
-      // Demo interactiva para que el usuario siempre pueda probar el flujo
-      const numId = parseInt(id, 10) || 1;
-      const statuses = ['CREADO', 'ACEPTADO', 'EN_PREPARACION', 'DESPACHADO', 'ENTREGADO'];
-      const status = statuses[numId % statuses.length];
-      setTrackingOrder({
-        id: numId,
-        customerId: 1000 + numId,
-        customerName: 'Cliente Corporativo',
-        createdAt: new Date(Date.now() - numId * 86400000).toISOString(),
-        total: 18990 + numId * 1500,
-        status: status,
-        items: [
-          { productId: 101, productName: 'Caja Embalaje Reforzada', quantity: 2, unitPrice: 2990 },
-          { productId: 102, productName: 'Cinta Adhesiva Industrial', quantity: 3, unitPrice: 1490 },
-        ],
-      });
+    } catch (err) {
+      setTrackingError(err?.response?.status === 404
+        ? `No existe un pedido con el número #${id}.`
+        : apiErrorMessage(err, 'No se pudo consultar el pedido. Intente nuevamente.'));
     } finally {
       setLoadingTracking(false);
     }
@@ -281,7 +238,7 @@ function HomePage() {
 
             {!isAuthenticated && (
               <button
-                onClick={() => instance.loginRedirect(loginRequest).catch(() => navigate('/login'))}
+                onClick={() => navigate('/login')}
                 style={{
                   background: '#fff', color: NAVY,
                   border: 'none', borderRadius: '10px',

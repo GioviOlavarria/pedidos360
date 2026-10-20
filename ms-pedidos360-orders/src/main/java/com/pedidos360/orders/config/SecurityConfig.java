@@ -1,71 +1,70 @@
 package com.pedidos360.orders.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Configuración de seguridad para ms-pedidos360-orders.
- * Valida JWT emitidos por Azure AD. Extrae roles del claim "roles".
- * Roles válidos del sistema: Admin, Operator, Customer.
+ *  - GET /api/orders/{id}: público (seguimiento de envíos por número de pedido).
+ *  - GET /api/orders: autenticado (Admin ve todos, Customer solo los suyos).
+ *  - POST /api/orders: autenticado (compra).
+ *  - PATCH /api/orders/{id}/status: Admin u Operator.
+ *  - PUT / DELETE: Admin.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${app.security.api-client-id:}")
+    private String apiClientId;
+
+    @Value("${app.security.admin-emails:}")
+    private String adminEmails;
+
+    @Value("${app.security.admin-tenant-id:}")
+    private String adminTenantId;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/orders/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/orders/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/orders").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasAnyRole("Admin", "Operator")
+                        .anyRequest().hasRole("Admin")
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .decoder(jwtDecoder())
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                        )
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
                 );
         return http.build();
     }
 
     @Bean
-    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
-        org.springframework.security.oauth2.jwt.NimbusJwtDecoder decoder =
-                org.springframework.security.oauth2.jwt.NimbusJwtDecoder
-                        .withJwkSetUri("https://login.microsoftonline.com/common/discovery/v2.0/keys")
-                        .build();
-
-        org.springframework.security.oauth2.core.OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> validator =
-                new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
-                        new org.springframework.security.oauth2.jwt.JwtTimestampValidator(),
-                        new org.springframework.security.oauth2.jwt.JwtClaimValidator<String>(
-                                org.springframework.security.oauth2.jwt.JwtClaimNames.ISS,
-                                iss -> iss != null && iss.startsWith("https://login.microsoftonline.com/")
-                        )
-                );
-        decoder.setJwtValidator(validator);
+    public JwtDecoder jwtDecoder() {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(AzureAdJwtSupport.JWK_SET_URI).build();
+        decoder.setJwtValidator(AzureAdJwtSupport.tokenValidator(apiClientId));
         return decoder;
     }
 
-    /**
-     * Convierte el claim "roles" del JWT de Azure AD en GrantedAuthority con prefijo ROLE_.
-     * Ejemplo: rol "Operator" → ROLE_Operator
-     */
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
-        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
-
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        converter.setJwtGrantedAuthoritiesConverter(
+                AzureAdJwtSupport.authoritiesConverter(AzureAdJwtSupport.parseEmails(adminEmails), adminTenantId));
         return converter;
     }
 }

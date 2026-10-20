@@ -1,5 +1,7 @@
 import { useMsal } from '@azure/msal-react';
 
+const DEFAULT_ADMIN_EMAIL = 'gi.olavarria@duocuc.cl';
+
 /**
  * resolveRoles
  * Determina de forma exhaustiva los roles de un usuario basándose en los claims
@@ -33,64 +35,32 @@ export function resolveRoles(account) {
     else rawRoles.push(soapRole);
   }
 
-  // 4. Identificadores de usuario en minúsculas
-  const username          = (account.username || '').toLowerCase();
-  const preferredUsername = (claims.preferred_username || '').toLowerCase();
-  const emailClaim        = (claims.email || '').toLowerCase();
-  const upnClaim          = (claims.upn || '').toLowerCase();
-  const uniqueNameClaim   = (claims.unique_name || '').toLowerCase();
-  const nameClaim         = (account.name || claims.name || '').toLowerCase();
+  // 4. Correo del usuario (cuentas personales y corporativas de Microsoft)
+  const userEmails = [
+    account.username,
+    claims.preferred_username,
+    claims.email,
+    claims.upn,
+  ]
+    .filter(Boolean)
+    .map((e) => e.toLowerCase());
 
-  const userIdentifiers = [
-    username,
-    preferredUsername,
-    emailClaim,
-    upnClaim,
-    uniqueNameClaim,
-    nameClaim,
-  ].filter(Boolean);
+  // Correos con rol Administrador (VITE_ADMIN_EMAIL admite varios separados por coma).
+  // IMPORTANTE: esto solo decide qué pantallas se muestran; el backend vuelve a validar
+  // el rol con el token en cada petición, así que no es posible "hacerse admin" desde el navegador.
+  const adminEmails = (import.meta.env.VITE_ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL)
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
 
-  // Correos y patrones de administradores autorizados
-  const KNOWN_ADMIN_IDENTIFIERS = [
-    'gi.olavsanchez@gmail.com',
-    'gi.olavsanchez',
-    'olavsanchez',
-    'gi.olavarria@duocuc.cl',
-    (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase(),
-  ].filter(Boolean);
-
-  // A) ¿Tiene rol 'Admin' explícito en Azure AD (insensible a mayúsculas)?
-  const hasAdminRole = rawRoles.some(
-    (r) => typeof r === 'string' && r.toLowerCase().includes('admin')
-  );
-
-  // B) ¿Coincide con alguno de los correos/patrones de administrador autorizados?
-  const matchesAdminEmail = userIdentifiers.some(
-    (id) => KNOWN_ADMIN_IDENTIFIERS.some((adminId) => id.includes(adminId))
-  );
-
-  // C) ¿Contiene palabra clave 'admin' o 'administrador'?
-  const containsAdminKeyword = userIdentifiers.some(
-    (id) => id.includes('admin') || id.includes('administrador')
-  );
-
-  // D) Override de desarrollo / prueba manual en sesión
-  const sessionRole = typeof window !== 'undefined'
-    ? (sessionStorage.getItem('pedidos360_override_role') || localStorage.getItem('pedidos360_override_role') || '').toLowerCase()
-    : '';
-
-  const isAdmin = hasAdminRole ||
-                  matchesAdminEmail ||
-                  containsAdminKeyword ||
-                  sessionRole === 'admin';
+  const hasAdminRole = rawRoles.some((r) => r === 'Admin');
+  const isAdmin = hasAdminRole || userEmails.some((e) => adminEmails.includes(e));
 
   if (isAdmin) {
     return ['Admin', 'Operator', 'Customer'];
   }
 
-  const hasOperatorRole = rawRoles.some(
-    (r) => typeof r === 'string' && r.toLowerCase().includes('operator')
-  ) || sessionRole === 'operator';
+  const hasOperatorRole = rawRoles.some((r) => r === 'Operator');
 
   if (hasOperatorRole) {
     return ['Operator', 'Customer'];

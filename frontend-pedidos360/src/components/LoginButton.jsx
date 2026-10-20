@@ -1,16 +1,11 @@
-import { useMsal } from '@azure/msal-react';
 import { useNavigate } from 'react-router-dom';
-import { loginRequest } from '../authConfig';
 
 function LoginButton() {
-  const { instance } = useMsal();
   const navigate = useNavigate();
 
+  // La página /login ofrece el login normal y el institucional (Duoc).
   function handleLogin() {
-    instance.loginRedirect(loginRequest).catch((error) => {
-      console.error('Error al redirigir al login:', error);
-      navigate('/login');
-    });
+    navigate('/login');
   }
 
   return (

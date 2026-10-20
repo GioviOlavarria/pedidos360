@@ -3,6 +3,7 @@ package com.pedidos360.orders.domain.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 
 @Entity
@@ -27,9 +28,12 @@ public class OrderItem {
     private Integer quantity;
 
     @NotNull
-    @Positive
+    @PositiveOrZero
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
+
+    @Column(name = "product_name")
+    private String productName;
 
     public OrderItem() {
     }
@@ -38,6 +42,11 @@ public class OrderItem {
         this.productId = productId;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
+    }
+
+    public OrderItem(Long productId, String productName, Integer quantity, BigDecimal unitPrice) {
+        this(productId, quantity, unitPrice);
+        this.productName = productName;
     }
 
     public Long getId() {
@@ -82,5 +91,13 @@ public class OrderItem {
 
     public void setUnitPrice(BigDecimal unitPrice) {
         this.unitPrice = unitPrice;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
     }
 }

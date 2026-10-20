@@ -4,7 +4,7 @@
 # Las variables VITE_* se pasan como ARG en tiempo de build y se exponen
 # como ENV para que Vite las detecte e incruste en el bundle estático.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 

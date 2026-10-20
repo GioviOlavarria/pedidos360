@@ -3,17 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import ProductCard from '../components/ProductCard';
 import ProductForm from '../components/ProductForm';
-import { getProducts, decreaseStock } from '../services/catalogService';
+import { getProducts } from '../services/catalogService';
 import { createOrder } from '../services/ordersService';
 import useUserRoles from '../hooks/useUserRoles';
-import { getCustomerIdFromAccount, formatMoney } from '../utils/userUtils';
-import { loginRequest } from '../authConfig';
+import { getCustomerIdFromAccount, formatMoney, apiErrorMessage } from '../utils/userUtils';
 
 const NAVY = '#003087';
 const ORANGE = '#FF6B00';
 
 function CatalogPage() {
-  const { accounts, instance } = useMsal();
+  const { accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const userRoles = useUserRoles();
   const navigate = useNavigate();
@@ -69,7 +68,7 @@ function CatalogPage() {
   const handleStartBuy = (product, quantity) => {
     if (!isAuthenticated) {
       if (window.confirm('Para realizar una compra debe iniciar sesión con su cuenta. ¿Desea iniciar sesión ahora?')) {
-        instance.loginRedirect(loginRequest).catch(() => navigate('/login'));
+        navigate('/login');
       }
       return;
     }
@@ -96,15 +95,14 @@ function CatalogPage() {
     };
 
     try {
+      // El backend valida precio y stock, descuenta el inventario y envía la boleta por correo.
       const orderRes = await createOrder(payload);
-      // Descontar stock en el catálogo
-      await decreaseStock(buyingProduct.id, buyingQty);
 
       setPurchaseSuccessOrder(orderRes.data);
       fetchProducts(); // refrescar stock en pantalla
     } catch (err) {
       console.error('Error al realizar compra ficticia:', err);
-      alert('Ocurrió un error al procesar la compra. Revise la consola o la conexión del servidor.');
+      alert(apiErrorMessage(err, 'Ocurrió un error al procesar la compra. Intente nuevamente.'));
     } finally {
       setPurchasing(false);
     }
@@ -166,7 +164,7 @@ function CatalogPage() {
           </div>
         ) : (
           <button
-            onClick={() => instance.loginRedirect(loginRequest).catch(() => navigate('/login'))}
+            onClick={() => navigate('/login')}
             style={{
               background: '#fff', border: `1.5px solid ${ORANGE}`, color: ORANGE,
               padding: '9px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem',

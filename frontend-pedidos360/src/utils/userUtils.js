@@ -15,6 +15,13 @@ export function getCustomerIdFromAccount(account) {
   return Math.abs(hash % 9000) + 1000;
 }
 
+/**
+ * Extrae el mensaje de error que devuelve el backend (campo "message"), o un texto por defecto.
+ */
+export function apiErrorMessage(err, fallback) {
+  return err?.response?.data?.message || fallback;
+}
+
 export function formatMoney(val) {
   return '$' + Number(val || 0).toLocaleString('es-CL', {
     minimumFractionDigits: 0,
