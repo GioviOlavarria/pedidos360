@@ -32,7 +32,7 @@ COPY --from=build /app/target/bff-0.0.1-SNAPSHOT.jar app.jar
 #   ms-pedidos360-bff     → EXPOSE 8080  (este archivo)
 #   ms-pedidos360-orders  → EXPOSE 8081
 #   ms-pedidos360-catalog → EXPOSE 8082
-EXPOSE 8080
+EXPOSE 8090
 
 # Ejecutar el JAR. Se usa la forma exec (array JSON) para que Java reciba
 # las señales del SO directamente (PID 1 correcto, shutdown limpio).
