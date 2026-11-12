@@ -71,8 +71,11 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
 
 4. **Accede a la plataforma**:
    - Plataforma web (Frontend): `http://localhost:3000`
+   - API Gateway / BFF: `http://localhost:8080`
    - Inicia sesión con tu cuenta de Microsoft.
    - Bandeja de correos de prueba (boletas): `http://localhost:8025`
+   - Panel de RabbitMQ: `http://localhost:15672`
+   - Panel de Kafka UI: `http://localhost:8085` (Broker KRaft en `localhost:9092`)
 
 ---
 
