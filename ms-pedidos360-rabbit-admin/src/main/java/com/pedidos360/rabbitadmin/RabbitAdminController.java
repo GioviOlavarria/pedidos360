@@ -37,6 +37,8 @@ import java.util.Map;
 public class RabbitAdminController {
 
     private static final String NAME = "[A-Za-z0-9._:-]+";
+    /** vhost por defecto; RestClient lo codifica como %2F en la URL. */
+    private static final String VHOST = "/";
     private static final ParameterizedTypeReference<List<Map<String, Object>>> LIST = new ParameterizedTypeReference<>() {
     };
 
@@ -52,7 +54,7 @@ public class RabbitAdminController {
 
     @GetMapping("/queues")
     public List<Map<String, Object>> listQueues() {
-        return list("/api/queues/%2F", "name", "type", "durable", "messages", "consumers", "arguments");
+        return list("/api/queues/{vhost}", "name", "type", "durable", "messages", "consumers", "arguments");
     }
 
     /** Crea una cola. type=quorum la replica en el clúster; deadLetterExchange la conecta a una DLQ. */
@@ -89,7 +91,7 @@ public class RabbitAdminController {
 
     @GetMapping("/exchanges")
     public List<Map<String, Object>> listExchanges() {
-        return list("/api/exchanges/%2F", "name", "type", "durable", "auto_delete").stream()
+        return list("/api/exchanges/{vhost}", "name", "type", "durable", "auto_delete").stream()
                 .filter(exchange -> !String.valueOf(exchange.get("name")).isEmpty())
                 .toList();
     }
@@ -111,7 +113,7 @@ public class RabbitAdminController {
 
     @GetMapping("/bindings")
     public List<Map<String, Object>> listBindings() {
-        return list("/api/bindings/%2F", "source", "destination", "destination_type", "routing_key").stream()
+        return list("/api/bindings/{vhost}", "source", "destination", "destination_type", "routing_key").stream()
                 .filter(binding -> !String.valueOf(binding.get("source")).isEmpty())
                 .toList();
     }
@@ -136,7 +138,7 @@ public class RabbitAdminController {
     }
 
     private List<Map<String, Object>> list(String path, String... fields) {
-        List<Map<String, Object>> items = management.get().uri(path).retrieve().body(LIST);
+        List<Map<String, Object>> items = management.get().uri(path, VHOST).retrieve().body(LIST);
         if (items == null) {
             return List.of();
         }
