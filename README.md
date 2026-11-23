@@ -14,7 +14,7 @@ Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrol
 - **Catálogo y Órdenes Independientes**: Microservicios separados para la gestión de productos e inventario, y para el flujo completo de compras.
 - **Autenticación Corporativa**: Integración nativa con Azure AD mediante MSAL-Browser y Spring Security OAuth2 (Roles: `Admin`, `Operator`, `Customer`).
 - **Diseño Moderno (UI/UX)**: Interfaz de usuario optimizada inspirada en paneles de control logísticos de primer nivel, responsive y rápida (Vite + React).
-- **Despliegue unificado con Docker**: Todo el ecosistema (MySQL, 3 Microservicios Java, Frontend React/Nginx) orquestado con `docker compose`.
+- **Despliegue unificado con Docker**: Microservicios Java, frontend React/Nginx, MySQL, RabbitMQ y Kafka orquestados con `docker compose`.
 - **Integración Continua (CI/CD)**: Flujos automatizados con GitHub Actions para asegurar compilaciones limpias.
 
 ---
@@ -67,7 +67,7 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
    ```bash
    docker compose up --build -d
    ```
-   Este proceso descargará las imágenes base, compilará el código fuente (Java y React) en paralelo, y levantará todos los contenedores (MySQL, cluster RabbitMQ de 3 nodos, MailHog, 4 microservicios y el frontend) en la red `pedidos360-net`.
+   Este proceso descarga las imágenes, compila el código y levanta la aplicación con MySQL, RabbitMQ, Kafka, ZooKeeper, Kafka UI y MailHog.
 
 4. **Accede a la plataforma**:
    - Plataforma web (Frontend): `http://localhost:3000`
@@ -75,7 +75,8 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
    - Inicia sesión con tu cuenta de Microsoft.
    - Bandeja de correos de prueba (boletas): `http://localhost:8025`
    - Panel de RabbitMQ: `http://localhost:15672`
-   - Panel de Kafka UI: `http://localhost:8085` (Broker KRaft en `localhost:9092`)
+   - Panel de Kafka UI: `http://localhost:8085`
+   - API de administración de Kafka: `http://localhost:8084/api/topics`
 
 ---
 
@@ -116,6 +117,50 @@ Cliente compra ──> BFF ──> orders ──(reserva stock, precios reales)�
 - Si el envío del correo falla, se reintenta 4 veces y luego el mensaje queda en `pedidos360.notifications.boleta.dlq`.
 - Por defecto los correos van a **MailHog**: ábrelos en `http://localhost:8025`. Para enviar correos reales, configura las variables `MAIL_*` en `infra/.env` (ver `infra/.env.example`).
 - Panel de RabbitMQ: `http://localhost:15672` (usuario/clave `RABBITMQ_USER` / `RABBITMQ_PASSWORD`).
+
+## Kafka y RabbitMQ en Docker
+
+Desde `infra` puedes elegir qué servicios del mismo `docker-compose.yml` levantar.
+
+| Componente | Comando |
+| --- | --- |
+| RabbitMQ, tres nodos | `docker compose up -d --wait rabbitmq1 rabbitmq2 rabbitmq3` |
+| Kafka, ZooKeeper, dos brokers y API de administración | `docker compose up -d --build --wait kafka-admin` |
+| Kafka UI con el clúster de Kafka | `docker compose up -d --wait kafka-ui` |
+
+Para comprobar los nodos de RabbitMQ, ejecuta `docker compose exec rabbitmq1 rabbitmqctl cluster_status`. Kafka UI permite inspeccionar los brokers, consultar grupos de consumidores y gestionar tópicos y configuraciones desde el clúster `pedidos360-cluster`.
+
+Los clientes locales de Kafka se conectan a `localhost:9092,localhost:9093`. Desde los contenedores se usa `kafka:29092,kafka2:29092`. Para habilitar el flujo de Kafka al ejecutar `orders` o `notifications` fuera de Docker, configura `KAFKA_ENABLED=true` y, si corresponde, `KAFKA_BOOTSTRAP_SERVERS`.
+
+### Eventos de pedidos y boletas
+
+| Tópico | Productor | Consumidor |
+| --- | --- | --- |
+| `pedidos360.orders.created` | `orders`, después de confirmar el pedido en la base de datos | `notifications`, grupo `pedidos360-notifications` |
+| `pedidos360.notifications.receipt-sent` | `notifications`, después de enviar la boleta por SMTP | `orders`, grupo `pedidos360-orders` |
+
+Los eventos usan el ID del pedido como clave y una marca de tiempo ISO 8601 como valor. Los consumidores registran los eventos para trazabilidad y RabbitMQ entrega los mensajes que disparan el envío de boletas. Las publicaciones de trazabilidad se reintentan dentro del plazo del productor Kafka. Si se agota ese plazo, el microservicio registra el fallo.
+
+El servicio `kafka-init` crea los dos tópicos de la aplicación con tres particiones y dos réplicas. Para comprobar el flujo con la plataforma completa, crea un pedido desde el frontend y revisa ambos tópicos en Kafka UI, los logs de `orders` y `notifications`, y la boleta en MailHog.
+
+### API de administración de Kafka
+
+El servicio `ms-pedidos360-kafka-admin` (antes `demo`) expone estas rutas en `http://localhost:8084`.
+
+| Método y ruta | Operación |
+| --- | --- |
+| `GET /api/topics` | Lista tópicos |
+| `POST /api/topics` | Crea un tópico con `name` y los campos opcionales `partitions`, `replicationFactor` y `configs` |
+| `GET /api/topics/{topic}` | Consulta particiones, líderes y réplicas |
+| `PATCH /api/topics/{topic}` | Aumenta el total de particiones, por ejemplo con `{"partitions":4}` |
+| `DELETE /api/topics/{topic}` | Elimina un tópico |
+| `GET /api/topics/{topic}/configs` | Consulta configuraciones efectivas del tópico |
+| `PATCH /api/topics/{topic}/configs` | Agrega, actualiza o elimina configuraciones del tópico |
+| `GET /api/brokers` | Lista brokers activos |
+| `GET /api/brokers/{id}/configs` | Consulta configuraciones efectivas del broker |
+| `PATCH /api/brokers/{id}/configs` | Agrega, actualiza o elimina configuraciones dinámicas del broker |
+
+En un `PATCH` de configuraciones, envía un objeto JSON con valores de texto para aplicar cambios, por ejemplo `{"retention.ms":"86400000"}`. Envía un valor `null` para quitar el valor personalizado y volver al valor heredado. Kafka admite aumentar el número de particiones y cambiar las configuraciones que el broker permite modificar en caliente.
 
 ## Tecnologías Utilizadas
 

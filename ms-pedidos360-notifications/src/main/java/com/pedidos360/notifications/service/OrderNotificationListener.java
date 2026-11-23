@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 public class OrderNotificationListener {
 
     private final BoletaMailService boletaMailService;
+    private final ObjectProvider<NotificationKafkaEvents> kafkaEvents;
 
     @RabbitListener(queues = RabbitMQConfig.QUEUE_BOLETA)
     public void handleOrderCreated(OrderCreatedEvent event) throws MessagingException {
@@ -38,5 +40,6 @@ public class OrderNotificationListener {
             log.warn("Fallo al enviar la boleta del pedido #{} a {}: {}", event.orderId(), event.customerEmail(), e.getMessage());
             throw e;
         }
+        kafkaEvents.ifAvailable(events -> events.publishReceiptSent(event.orderId()));
     }
 }
