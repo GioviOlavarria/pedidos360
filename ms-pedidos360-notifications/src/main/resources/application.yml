@@ -4,6 +4,19 @@ server:
 spring:
   application:
     name: ms-pedidos360-notifications
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093}
+    producer:
+      acks: all
+      properties:
+        max.block.ms: 1000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 15000
+    consumer:
+      group-id: pedidos360-notifications
+      auto-offset-reset: earliest
+      properties:
+        allow.auto.create.topics: false
   rabbitmq:
     # Lista de nodos del cluster: si uno cae, el cliente se conecta al siguiente.
     addresses: ${RABBITMQ_ADDRESSES:localhost:5672}
@@ -38,6 +51,10 @@ spring:
           writetimeout: 10000
 
 app:
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+    order-created-topic: pedidos360.orders.created
+    receipt-sent-topic: pedidos360.notifications.receipt-sent
   mail:
     from: ${MAIL_FROM:Pedidos360 <noreply@pedidos360.com>}
 

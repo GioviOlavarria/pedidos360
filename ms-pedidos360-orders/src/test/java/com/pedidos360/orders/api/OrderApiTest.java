@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,9 +21,11 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,7 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {"app.kafka.enabled=true", "spring.kafka.listener.auto-startup=false"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class OrderApiTest {
@@ -51,11 +54,15 @@ class OrderApiTest {
     @MockBean
     private RabbitTemplate rabbitTemplate;
 
+    @MockBean
+    private KafkaTemplate<String, String> kafkaTemplate;
+
     @BeforeEach
     void setUp() {
         repository.deleteAll();
         when(catalogClient.reserve(any()))
                 .thenReturn(List.of(new ReservedItem(7L, "Caja", new BigDecimal("2990.00"), 2)));
+        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(CompletableFuture.completedFuture(null));
     }
 
     @Test
@@ -75,7 +82,7 @@ class OrderApiTest {
     }
 
     @Test
-    void customerBuysWithCatalogPriceAndBoletaIsPublished() throws Exception {
+    void customerBuysWithCatalogPriceAndEventsArePublished() throws Exception {
         mvc.perform(post("/api/orders").with(customer("cliente@outlook.com"))
                         .contentType(MediaType.APPLICATION_JSON).content(ORDER_JSON))
                 .andExpect(status().isCreated())
@@ -85,6 +92,8 @@ class OrderApiTest {
 
         verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.EXCHANGE),
                 eq(RabbitMQConfig.ROUTING_KEY_ORDER_CREATED), any(OrderCreatedEvent.class));
+        String orderId = repository.findAll().getFirst().getId().toString();
+        verify(kafkaTemplate).send(eq("pedidos360.orders.created"), eq(orderId), anyString());
     }
 
     @Test

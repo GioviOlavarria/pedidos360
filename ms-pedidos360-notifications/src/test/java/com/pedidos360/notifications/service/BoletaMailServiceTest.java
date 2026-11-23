@@ -3,7 +3,9 @@ package com.pedidos360.notifications.service;
 import com.pedidos360.notifications.model.OrderCreatedEvent;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
@@ -54,10 +56,29 @@ class BoletaMailServiceTest {
     @Test
     void eventWithoutEmailGoesToDeadLetterQueue() throws Exception {
         BoletaMailService mailService = mock(BoletaMailService.class);
-        OrderNotificationListener listener = new OrderNotificationListener(mailService);
+        var beans = new DefaultListableBeanFactory();
+        var kafka = mock(NotificationKafkaEvents.class);
+        beans.registerSingleton("notificationKafkaEvents", kafka);
+        var listener = new OrderNotificationListener(mailService, beans.getBeanProvider(NotificationKafkaEvents.class));
         OrderCreatedEvent noEmail = new OrderCreatedEvent(1L, null, "x", null, BigDecimal.ONE, List.of());
 
         assertThrows(AmqpRejectAndDontRequeueException.class, () -> listener.handleOrderCreated(noEmail));
         verify(mailService, never()).sendBoleta(any());
+        verifyNoInteractions(kafka);
+    }
+
+    @Test
+    void publishesKafkaConfirmationAfterSendingMail() throws Exception {
+        var mailService = mock(BoletaMailService.class);
+        var kafka = mock(NotificationKafkaEvents.class);
+        var beans = new DefaultListableBeanFactory();
+        beans.registerSingleton("notificationKafkaEvents", kafka);
+        var listener = new OrderNotificationListener(mailService, beans.getBeanProvider(NotificationKafkaEvents.class));
+
+        listener.handleOrderCreated(EVENT);
+
+        InOrder order = inOrder(mailService, kafka);
+        order.verify(mailService).sendBoleta(EVENT);
+        order.verify(kafka).publishReceiptSent(EVENT.orderId());
     }
 }
