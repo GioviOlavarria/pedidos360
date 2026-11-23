@@ -72,6 +72,10 @@ public class OrderController {
                 order.getTotal()
         );
         response.setCustomerName(order.getCustomerName());
+        response.setReceiptFolio(order.getReceiptFolio());
+        response.setReceiptTrackId(order.getReceiptTrackId());
+        response.setReceiptSiiStatus(order.getReceiptSiiStatus());
+        response.setReceiptIssuedAt(order.getReceiptIssuedAt());
 
         List<OrderItemResponse> itemResponses = new ArrayList<>();
         for (OrderItem item : order.getItems()) {

@@ -4,19 +4,56 @@ server:
 spring:
   application:
     name: ms-pedidos360-orders
+  # ── Cliente Kafka (clúster ZooKeeper + 2 brokers de infra/docker-compose.yml) ──
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093}
+    client-id: ms-pedidos360-orders
+    admin:
+      # Crea los tópicos declarados como NewTopic y alinea su configuración si alguien la cambió.
+      auto-create: true
+      modify-topic-configs: true
+      fail-fast: false
     producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # acks=all + idempotencia: el mensaje queda en todas las réplicas en sincronía y sin duplicados por reintentos.
       acks: all
+      retries: 10
+      compression-type: lz4
+      batch-size: 16384
       properties:
-        max.block.ms: 1000
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        linger.ms: 5
+        # Tiempo máximo que send() bloquea el hilo HTTP si no hay metadata del clúster.
+        max.block.ms: 3000
         request.timeout.ms: 10000
-        delivery.timeout.ms: 15000
+        delivery.timeout.ms: 30000
+        spring.json.add.type.headers: false
     consumer:
+      # Grupo propio: orders recibe todas las boletas emitidas (las 3 particiones se reparten entre sus hilos).
       group-id: pedidos360-orders
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer evita que un mensaje corrupto ("poison pill") bloquee la partición.
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      max-poll-records: 100
+      isolation-level: read-committed
       properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: com.pedidos360.orders.messaging.kafka.ReceiptIssuedMessage
+        spring.json.use.type.headers: false
+        spring.json.trusted.packages: com.pedidos360.*
         allow.auto.create.topics: false
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        session.timeout.ms: 15000
+        heartbeat.interval.ms: 3000
+        max.poll.interval.ms: 300000
+    listener:
+      # Commit del offset después de procesar cada registro (at-least-once).
+      ack-mode: record
+      missing-topics-fatal: false
   rabbitmq:
     # Lista de nodos del cluster: si uno cae, el cliente se conecta al siguiente.
     addresses: ${RABBITMQ_ADDRESSES:localhost:5672}
@@ -34,9 +71,10 @@ management:
 
 app:
   kafka:
+    # En Docker se activa con KAFKA_ENABLED=true. Tópicos: ver messaging/kafka/KafkaTopics.
     enabled: ${KAFKA_ENABLED:false}
-    order-created-topic: pedidos360.orders.created
-    receipt-sent-topic: pedidos360.notifications.receipt-sent
+    # Hilos consumidores = particiones del tópico (3).
+    listener-concurrency: 3
   security:
     # App Registration de la API (BFF). El token debe tener aud = este client id.
     api-client-id: ${API_CLIENT_ID:}

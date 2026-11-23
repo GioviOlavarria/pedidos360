@@ -10,7 +10,9 @@ import com.pedidos360.orders.domain.model.OrderItem;
 import com.pedidos360.orders.domain.model.OrderStatus;
 import com.pedidos360.orders.domain.model.exception.InvalidOrderStateException;
 import com.pedidos360.orders.domain.model.exception.OrderNotFoundException;
+import com.pedidos360.orders.messaging.OrderChangedEvent;
 import com.pedidos360.orders.messaging.OrderCreatedEvent;
+import com.pedidos360.orders.messaging.kafka.OrderEventType;
 import com.pedidos360.orders.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
@@ -99,13 +102,16 @@ public class OrderService {
         order.setCustomerId(request.getCustomerId());
         order.getItems().clear();
         applyItems(order, reserved);
+        Order saved;
         try {
-            return orderRepository.saveAndFlush(order);
+            saved = orderRepository.saveAndFlush(order);
         } catch (RuntimeException e) {
             releaseQuietly(requested);
             reserveQuietly(previous);
             throw e;
         }
+        eventPublisher.publishEvent(OrderChangedEvent.of(OrderEventType.UPDATED, order, order.getStatus()));
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -129,7 +135,9 @@ public class OrderService {
         if (STOCK_IN_WAREHOUSE.contains(order.getStatus())) {
             catalogClient.release(itemsOf(order));
         }
+        OrderChangedEvent deleted = OrderChangedEvent.of(OrderEventType.DELETED, order, order.getStatus());
         orderRepository.delete(order);
+        eventPublisher.publishEvent(deleted);
     }
 
     public Order changeStatus(Long orderId, OrderStatus nuevoEstado) {
@@ -140,8 +148,27 @@ public class OrderService {
             catalogClient.release(itemsOf(order));
         }
 
+        OrderStatus anterior = order.getStatus();
         order.setStatus(nuevoEstado);
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        eventPublisher.publishEvent(OrderChangedEvent.of(OrderEventType.STATUS_CHANGED, order, anterior));
+        return saved;
+    }
+
+    /**
+     * Registra la boleta electrónica emitida para un pedido (evento Kafka de notifications).
+     * Es idempotente: reprocesar el mismo mensaje deja el pedido igual. Si el pedido ya no existe
+     * (fue eliminado) no hay nada que actualizar y el evento se descarta.
+     */
+    public void registerReceipt(Long orderId, Long folio, String trackId, String siiStatus, Instant issuedAt) {
+        orderRepository.findById(orderId).ifPresentOrElse(order -> {
+            order.setReceiptFolio(folio);
+            order.setReceiptTrackId(trackId);
+            order.setReceiptSiiStatus(siiStatus);
+            order.setReceiptIssuedAt(issuedAt);
+            orderRepository.save(order);
+            log.info("Pedido #{}: boleta folio {} registrada (SII {}, track {})", orderId, folio, siiStatus, trackId);
+        }, () -> log.warn("Boleta folio {} para pedido #{} inexistente: se descarta", folio, orderId));
     }
 
     private void applyItems(Order order, List<ReservedItem> reserved) {

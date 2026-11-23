@@ -5,8 +5,13 @@ import com.pedidos360.orders.client.CatalogClient.ReservedItem;
 import com.pedidos360.orders.config.RabbitMQConfig;
 import com.pedidos360.orders.messaging.OrderCreatedEvent;
 import com.pedidos360.orders.repository.OrderRepository;
+import com.pedidos360.orders.messaging.kafka.KafkaTopics;
+import com.pedidos360.orders.messaging.kafka.OrderEventMessage;
+import com.pedidos360.orders.messaging.kafka.OrderEventType;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -24,8 +29,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,7 +39,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {"app.kafka.enabled=true", "spring.kafka.listener.auto-startup=false"})
+@SpringBootTest(properties = {"app.kafka.enabled=true", "spring.kafka.listener.auto-startup=false",
+        "spring.kafka.admin.auto-create=false"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class OrderApiTest {
@@ -55,14 +61,14 @@ class OrderApiTest {
     private RabbitTemplate rabbitTemplate;
 
     @MockBean
-    private KafkaTemplate<String, String> kafkaTemplate;
+    private KafkaTemplate<String, Object> kafkaTemplate;
 
     @BeforeEach
     void setUp() {
         repository.deleteAll();
         when(catalogClient.reserve(any()))
                 .thenReturn(List.of(new ReservedItem(7L, "Caja", new BigDecimal("2990.00"), 2)));
-        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(CompletableFuture.completedFuture(null));
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(new CompletableFuture<>());
     }
 
     @Test
@@ -92,8 +98,14 @@ class OrderApiTest {
 
         verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.EXCHANGE),
                 eq(RabbitMQConfig.ROUTING_KEY_ORDER_CREATED), any(OrderCreatedEvent.class));
-        String orderId = repository.findAll().getFirst().getId().toString();
-        verify(kafkaTemplate).send(eq("pedidos360.orders.created"), eq(orderId), anyString());
+        Long orderId = repository.findAll().getFirst().getId();
+        ArgumentCaptor<ProducerRecord<String, Object>> record = ArgumentCaptor.forClass(ProducerRecord.class);
+        verify(kafkaTemplate).send(record.capture());
+        assertEquals(KafkaTopics.ORDER_EVENTS, record.getValue().topic());
+        assertEquals(orderId.toString(), record.getValue().key());
+        OrderEventMessage message = (OrderEventMessage) record.getValue().value();
+        assertEquals(OrderEventType.CREATED, message.type());
+        assertEquals(0, new BigDecimal("5980.00").compareTo(message.total()));
     }
 
     @Test

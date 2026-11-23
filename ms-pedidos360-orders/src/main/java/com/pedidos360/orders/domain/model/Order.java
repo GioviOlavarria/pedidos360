@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +41,19 @@ public class Order {
 
     @Column(name = "customer_name")
     private String customerName;
+
+    /** Boleta electrónica (SII) informada por notifications a través de Kafka. */
+    @Column(name = "receipt_folio")
+    private Long receiptFolio;
+
+    @Column(name = "receipt_track_id", length = 64)
+    private String receiptTrackId;
+
+    @Column(name = "receipt_sii_status", length = 32)
+    private String receiptSiiStatus;
+
+    @Column(name = "receipt_issued_at")
+    private Instant receiptIssuedAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> items = new ArrayList<>();
@@ -108,6 +122,38 @@ public class Order {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
+    }
+
+    public Long getReceiptFolio() {
+        return receiptFolio;
+    }
+
+    public void setReceiptFolio(Long receiptFolio) {
+        this.receiptFolio = receiptFolio;
+    }
+
+    public String getReceiptTrackId() {
+        return receiptTrackId;
+    }
+
+    public void setReceiptTrackId(String receiptTrackId) {
+        this.receiptTrackId = receiptTrackId;
+    }
+
+    public String getReceiptSiiStatus() {
+        return receiptSiiStatus;
+    }
+
+    public void setReceiptSiiStatus(String receiptSiiStatus) {
+        this.receiptSiiStatus = receiptSiiStatus;
+    }
+
+    public Instant getReceiptIssuedAt() {
+        return receiptIssuedAt;
+    }
+
+    public void setReceiptIssuedAt(Instant receiptIssuedAt) {
+        this.receiptIssuedAt = receiptIssuedAt;
     }
 
     public List<OrderItem> getItems() {

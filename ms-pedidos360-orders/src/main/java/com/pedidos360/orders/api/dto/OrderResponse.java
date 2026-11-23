@@ -13,6 +13,10 @@ public class OrderResponse {
     private BigDecimal total;
     private String customerName;
     private java.util.List<OrderItemResponse> items;
+    private Long receiptFolio;
+    private String receiptTrackId;
+    private String receiptSiiStatus;
+    private java.time.Instant receiptIssuedAt;
 
     public OrderResponse() {
     }
@@ -79,5 +83,37 @@ public class OrderResponse {
 
     public void setItems(java.util.List<OrderItemResponse> items) {
         this.items = items;
+    }
+
+    public Long getReceiptFolio() {
+        return receiptFolio;
+    }
+
+    public void setReceiptFolio(Long receiptFolio) {
+        this.receiptFolio = receiptFolio;
+    }
+
+    public String getReceiptTrackId() {
+        return receiptTrackId;
+    }
+
+    public void setReceiptTrackId(String receiptTrackId) {
+        this.receiptTrackId = receiptTrackId;
+    }
+
+    public String getReceiptSiiStatus() {
+        return receiptSiiStatus;
+    }
+
+    public void setReceiptSiiStatus(String receiptSiiStatus) {
+        this.receiptSiiStatus = receiptSiiStatus;
+    }
+
+    public java.time.Instant getReceiptIssuedAt() {
+        return receiptIssuedAt;
+    }
+
+    public void setReceiptIssuedAt(java.time.Instant receiptIssuedAt) {
+        this.receiptIssuedAt = receiptIssuedAt;
     }
 }
