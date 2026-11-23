@@ -1,0 +1,46 @@
+<div class="p-modal-overlay">
+  <div class="p-modal" role="dialog" aria-modal="true">
+    <div class="p-modal-header">
+      <h2>{{ product() ? 'Editar Producto' : 'Nuevo Producto' }}</h2>
+      <button type="button" class="p-modal-close" (click)="closed.emit(false)" aria-label="Cerrar">✕</button>
+    </div>
+
+    <form class="p-modal-body" [formGroup]="form" (ngSubmit)="submit()">
+      @if (error()) {
+        <p class="p-form-error">{{ error() }}</p>
+      }
+
+      <div class="p-field">
+        <label class="p-label" for="name">Nombre</label>
+        <input id="name" type="text" class="p-input" formControlName="name" />
+      </div>
+
+      <div class="p-field">
+        <label class="p-label" for="description">Descripción</label>
+        <textarea id="description" class="p-input" formControlName="description" rows="3"></textarea>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px">
+        <div>
+          <label class="p-label" for="price">Precio ($)</label>
+          <input id="price" type="number" step="0.01" min="0" class="p-input" formControlName="price" />
+        </div>
+        <div>
+          <label class="p-label" for="stock">Stock inicial</label>
+          <input id="stock" type="number" min="0" class="p-input" formControlName="stock" />
+        </div>
+      </div>
+
+      @if (form.touched && form.invalid) {
+        <p class="p-form-error">Complete todos los campos; precio y stock no pueden ser negativos.</p>
+      }
+
+      <div class="p-modal-actions">
+        <button type="button" class="p-btn p-btn-secondary" (click)="closed.emit(false)">Cancelar</button>
+        <button type="submit" class="p-btn p-btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Guardando...' : 'Guardar Producto' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

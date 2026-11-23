@@ -1,0 +1,56 @@
+<div class="p-page">
+  <header class="p-page-header">
+    <div>
+      <div class="p-title-row">
+        <h1 class="p-title">{{ auth.isAdmin() ? 'Gestión de Pedidos' : 'Mis Pedidos' }}</h1>
+        <span class="p-tag" [class.admin]="auth.isAdmin()" [class.customer]="!auth.isAdmin()">
+          {{ auth.isAdmin() ? 'Vista Administrador' : 'Vista Cliente' }}
+        </span>
+      </div>
+      <p class="p-subtitle">
+        {{ auth.isAdmin()
+          ? 'Administre el flujo y avance de estado de todos los pedidos del sistema.'
+          : 'Haga seguimiento en tiempo real al estado de sus compras ficticias.' }}
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" class="p-btn p-btn-light" (click)="load()">🔄 Actualizar</button>
+      @if (auth.isAdmin()) {
+        <button type="button" class="p-btn p-btn-primary" (click)="openForm(null)"><span>+</span> Nuevo Pedido</button>
+      } @else {
+        <a routerLink="/catalog" class="p-btn p-btn-primary">🛍️ Explorar Catálogo</a>
+      }
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="p-card list">
+      <h2 class="p-card-title">{{ auth.isAdmin() ? 'Listado general de pedidos' : 'Historial de mis pedidos' }}</h2>
+      @if (loading()) {
+        <p class="p-muted">⏳ Cargando pedidos...</p>
+      } @else if (error()) {
+        <p class="error">⚠️ {{ error() }}</p>
+      } @else {
+        <app-order-list [orders]="orders()" [isAdmin]="auth.isAdmin()" [selectedId]="selectedId()"
+          (select)="selectedId.set($event.id)" (remove)="deleteOrder($event)" />
+      }
+    </section>
+
+    <section class="side">
+      @if (selectedId(); as id) {
+        <app-order-detail [orderId]="id" [isAdmin]="auth.isAdmin()" [refreshKey]="refreshKey()" (changed)="load()"
+          (edit)="openForm($event)" />
+      } @else {
+        <div class="placeholder">
+          <div class="placeholder-icon">📦</div>
+          <p>Seleccione un pedido de la lista para ver su seguimiento y detalle.</p>
+        </div>
+      }
+    </section>
+  </div>
+</div>
+
+@if (showForm()) {
+  <app-order-form [order]="editing()" (closed)="formClosed($event)" />
+}

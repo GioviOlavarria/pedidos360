@@ -1,0 +1,114 @@
+<div class="p-page">
+  <header class="p-page-header">
+    <div>
+      <div class="p-title-row">
+        <h1 class="p-title">{{ auth.isAdmin() ? 'Catálogo e Inventario' : 'Catálogo de Productos' }}</h1>
+        @if (auth.isAdmin()) {
+          <span class="p-tag admin">Vista Administrador</span>
+        } @else if (auth.isAuthenticated()) {
+          <span class="p-tag client-orange">Vista Cliente</span>
+        } @else {
+          <span class="p-tag public">Vista Pública</span>
+        }
+      </div>
+      <p class="p-subtitle">
+        @if (auth.isAdmin()) {
+          Administre el inventario, agregue nuevos productos o modifique precios y existencias.
+        } @else if (auth.isAuthenticated()) {
+          Explore los productos disponibles en la base de datos y realice compras ficticias en tiempo real.
+        } @else {
+          Explore nuestro catálogo de productos en tiempo real. Inicie sesión para realizar pedidos.
+        }
+      </p>
+    </div>
+
+    @if (auth.isAdmin()) {
+      <button type="button" class="p-btn p-btn-primary" (click)="openForm(null)"><span>+</span> Nuevo Producto</button>
+    } @else if (auth.isAuthenticated()) {
+      <div class="customer-chip">
+        <span>👤</span>
+        <div>
+          <strong>{{ auth.displayName() }}</strong>
+          <div>ID Cliente: #{{ customerId() }}</div>
+        </div>
+      </div>
+    } @else {
+      <a routerLink="/login" class="login-outline"><span>🔑</span> Iniciar sesión</a>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="state">⏳ Cargando catálogo de productos...</div>
+  } @else if (error()) {
+    <div class="p-alert-error">{{ error() }}</div>
+  } @else if (products().length === 0) {
+    <div class="empty">
+      <div class="empty-icon">📦</div>
+      <p><strong>No hay productos registrados en la base de datos.</strong></p>
+      @if (auth.isAdmin()) {
+        <p>Haga clic en <strong>"+ Nuevo Producto"</strong> para poblar la base de datos.</p>
+      }
+    </div>
+  } @else {
+    <div class="grid">
+      @for (product of products(); track product.id) {
+        <app-product-card [product]="product" [isAdmin]="auth.isAdmin()" (edit)="openForm($event)"
+          (remove)="deleteProduct($event)" (buy)="startBuy($event)" />
+      }
+    </div>
+  }
+</div>
+
+@if (showForm()) {
+  <app-product-form [product]="editing()" (closed)="formClosed($event)" />
+}
+
+@if (buying(); as selection) {
+  <div class="p-modal-overlay">
+    <div class="p-modal" role="dialog" aria-modal="true">
+      <div class="p-modal-header">
+        <h2>{{ purchased() ? '🎉 ¡Compra Confirmada!' : '🛍️ Confirmar Pedido Ficticio' }}</h2>
+        <button type="button" class="p-modal-close" (click)="closePurchase()" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="p-modal-body">
+        @if (purchased(); as order) {
+          <div class="success">
+            <div class="success-icon">✅</div>
+            <h3>Pedido #{{ order.id }} Generado</h3>
+            <p>Su pedido se ha registrado en el sistema con estado <strong>CREADO</strong>.<br />
+              La boleta electrónica llegará a su correo.</p>
+          </div>
+          <div class="p-summary">
+            <div class="p-summary-row"><span>Producto:</span><strong>{{ selection.product.name }} (x{{ selection.quantity }})</strong></div>
+            <div class="p-summary-row"><span>Cliente:</span><span>{{ auth.displayName() }} (#{{ customerId() }})</span></div>
+            <div class="p-summary-total"><span>Total Pagado:</span><strong>{{ order.total | money }}</strong></div>
+          </div>
+          <div class="p-modal-actions">
+            <button type="button" class="p-btn p-btn-secondary grow" (click)="closePurchase()">Seguir Comprando</button>
+            <a routerLink="/orders" class="p-btn p-btn-primary grow">📦 Ver en Mis Pedidos</a>
+          </div>
+        } @else {
+          <p class="intro">Está a punto de realizar una compra ficticia para probar el flujo de Pedidos360:</p>
+          <div class="p-summary">
+            <div class="p-summary-row"><span>Producto:</span><strong>{{ selection.product.name }}</strong></div>
+            <div class="p-summary-row"><span>Precio unitario:</span><span>{{ selection.product.price | money }}</span></div>
+            <div class="p-summary-row"><span>Cantidad seleccionada:</span><strong>{{ selection.quantity }} un.</strong></div>
+            <div class="p-summary-row"><span>ID Cliente (Automático):</span><span>#{{ customerId() }}</span></div>
+            <div class="p-summary-total"><span>Total del Pedido:</span><strong>{{ selection.product.price * selection.quantity | money }}</strong></div>
+          </div>
+          <div class="hint">
+            💡 Al confirmar, se creará un registro de orden en el microservicio <strong>orders</strong> y se descontará
+            el stock en <strong>catalog</strong>.
+          </div>
+          <div class="p-modal-actions">
+            <button type="button" class="p-btn p-btn-secondary" (click)="closePurchase()" [disabled]="purchasing()">Cancelar</button>
+            <button type="button" class="p-btn p-btn-primary" (click)="confirmPurchase()" [disabled]="purchasing()">
+              {{ purchasing() ? 'Procesando Compra...' : 'Confirmar Compra' }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}

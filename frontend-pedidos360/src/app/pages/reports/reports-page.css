@@ -1,0 +1,154 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.controls label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+.controls select {
+  width: auto;
+  font-weight: 600;
+  color: var(--navy);
+}
+.block {
+  margin-bottom: 24px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.kpi {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  border-top: 3px solid var(--navy);
+  display: flex;
+  flex-direction: column;
+}
+.kpi span {
+  font-size: 1.3rem;
+  margin-bottom: 6px;
+}
+.kpi strong {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+.kpi small {
+  font-size: 0.78rem;
+  color: var(--slate-400);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.accent {
+  border-top: 3px solid var(--orange);
+}
+.stream {
+  margin-top: 24px;
+}
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hint {
+  font-size: 0.75rem;
+  color: var(--slate-400);
+}
+
+.bars {
+  height: 220px;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px 0 8px;
+}
+.bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+}
+.bar-value {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+.bar-value.zero {
+  color: var(--slate-300);
+}
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(to top, var(--navy), #0056d6);
+  border-radius: 6px 6px 0 0;
+  transition: height 0.4s ease;
+}
+.bar-fill.zero {
+  background: var(--slate-100);
+}
+.bar span {
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  font-weight: 600;
+}
+
+.dist {
+  margin-bottom: 10px;
+}
+.dist-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+  color: var(--slate-600);
+  font-weight: 600;
+}
+
+.num {
+  text-align: right !important;
+}
+.rank {
+  font-weight: 800;
+  color: var(--navy);
+}
+.rank.first {
+  color: var(--orange);
+}
+.name {
+  color: var(--navy);
+  font-weight: 600;
+}
+.money {
+  color: var(--orange);
+  font-weight: 700;
+}
+.empty {
+  text-align: center;
+  padding: 36px !important;
+  color: var(--slate-400);
+}
+
+@media (max-width: 1100px) {
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}

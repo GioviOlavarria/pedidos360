@@ -1,0 +1,379 @@
+/* Estilos globales de Pedidos360. Las clases compartidas usan el prefijo p- para no chocar con Bootstrap. */
+:root {
+  --navy: #003087;
+  --navy-dark: #001a4d;
+  --orange: #ff6b00;
+  --orange-dark: #e66000;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --danger: #b91c1c;
+  --danger-bg: #fee2e2;
+  --success: #15803d;
+  --success-bg: #dcfce7;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ── Página ─────────────────────────────────────────────────────────────── */
+.p-page {
+  padding: 32px 36px;
+  min-height: 100%;
+}
+
+.p-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.p-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.p-title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0;
+}
+
+.p-subtitle {
+  color: var(--slate-500);
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.p-tag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.p-tag.admin {
+  background: rgba(0, 48, 135, 0.1);
+  color: var(--navy);
+}
+.p-tag.customer {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+.p-tag.client-orange {
+  background: rgba(255, 107, 0, 0.12);
+  color: var(--orange);
+}
+.p-tag.public {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--slate-600);
+}
+
+.p-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.p-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 16px;
+}
+
+/* ── Botones ────────────────────────────────────────────────────────────── */
+.p-btn {
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+.p-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.p-btn-primary {
+  background: var(--orange);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
+}
+.p-btn-primary:hover:not(:disabled) {
+  background: var(--orange-dark);
+}
+.p-btn-navy {
+  background: var(--navy);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 48, 135, 0.2);
+}
+.p-btn-navy:hover:not(:disabled) {
+  background: #002266;
+}
+.p-btn-secondary {
+  background: #fff;
+  color: var(--slate-500);
+  border: 1px solid var(--slate-300);
+  font-weight: 600;
+}
+.p-btn-secondary:hover:not(:disabled) {
+  background: var(--slate-100);
+}
+.p-btn-light {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid var(--slate-300);
+  font-weight: 600;
+}
+.p-btn-light:hover:not(:disabled) {
+  background: var(--slate-100);
+}
+.p-btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 600;
+}
+.p-btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+.p-btn-block {
+  width: 100%;
+}
+
+/* ── Modales ────────────────────────────────────────────────────────────── */
+.p-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 48, 135, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 20px;
+}
+.p-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 500px;
+  max-width: 100%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.p-modal-header {
+  padding: 20px 24px;
+  background: var(--slate-50);
+  border-bottom: 1px solid var(--slate-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.p-modal-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--navy);
+}
+.p-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--slate-400);
+  cursor: pointer;
+}
+.p-modal-body {
+  padding: 24px;
+}
+.p-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* ── Formularios ────────────────────────────────────────────────────────── */
+.p-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+.p-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-300);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.p-input:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+.p-field {
+  margin-bottom: 16px;
+}
+.p-form-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+/* ── Mensajes y resúmenes ───────────────────────────────────────────────── */
+.p-alert-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+}
+.p-muted {
+  color: var(--slate-400);
+}
+.p-summary {
+  background: var(--slate-50);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.p-summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+}
+.p-summary-row > span:first-child {
+  color: var(--slate-500);
+}
+.p-summary-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 10px;
+  border-top: 1px solid var(--slate-200);
+  font-weight: 700;
+  color: var(--navy);
+}
+.p-summary-total strong {
+  color: var(--orange);
+  font-size: 1.15rem;
+}
+
+/* ── Tablas ─────────────────────────────────────────────────────────────── */
+.p-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.p-table th {
+  text-align: left;
+  padding: 10px;
+  color: var(--slate-400);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--slate-100);
+}
+.p-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--slate-50);
+}
+.p-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Selector de cantidad ───────────────────────────────────────────────── */
+.p-qty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--slate-50);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+}
+.p-qty > span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--slate-500);
+}
+.p-qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.p-qty-controls button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--slate-300);
+  background: #fff;
+  cursor: pointer;
+  font-weight: bold;
+}
+.p-qty-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.p-qty-controls strong {
+  font-size: 0.9rem;
+  color: var(--navy);
+  min-width: 22px;
+  text-align: center;
+}
+
+/* ── Progreso / barras ──────────────────────────────────────────────────── */
+.p-bar {
+  background: var(--slate-100);
+  border-radius: 8px;
+  height: 7px;
+  overflow: hidden;
+}
+.p-bar > div {
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.8s ease;
+}
+
+@media (max-width: 900px) {
+  .p-page {
+    padding: 20px 16px;
+  }
+}

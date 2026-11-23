@@ -1,0 +1,83 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+      </div>
+      <div>
+        <span class="brand-name">Pedidos<span>360</span></span>
+        <span class="brand-sub">
+          {{ auth.isAuthenticated() ? (auth.isAdmin() ? 'Panel Administrador' : 'Portal Cliente') : 'Catálogo Público' }}
+        </span>
+      </div>
+    </div>
+
+    <nav class="menu">
+      <p class="nav-heading">Menú {{ auth.isAdmin() ? 'Administrativo' : 'Principal' }}</p>
+      <ul>
+        @for (item of navItems(); track item.path) {
+          <li>
+            <a [routerLink]="item.path" routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: item.exact ?? false }">
+              <span class="nav-icon">{{ item.icon }}</span>{{ item.label }}
+            </a>
+          </li>
+        }
+        @if (!auth.isAuthenticated()) {
+          <li>
+            <a routerLink="/login" class="nav-login"><span class="nav-icon">🔐</span>Iniciar sesión</a>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    <div class="user">
+      @if (auth.isAuthenticated()) {
+        <div class="user-row">
+          <div class="avatar" [class.admin]="auth.isAdmin()">{{ initial() }}</div>
+          <div class="user-info">
+            <div class="user-name">{{ auth.displayName() }}</div>
+            <div class="user-role" [class.admin]="auth.isAdmin()">
+              {{ auth.isAdmin() ? 'ADMINISTRADOR' : 'CLIENTE' }}
+            </div>
+          </div>
+        </div>
+        <button type="button" class="logout" (click)="logout()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Cerrar sesión
+        </button>
+      } @else {
+        <div class="user-row">
+          <div class="avatar guest">👤</div>
+          <div class="user-info">
+            <div class="user-name">Modo Invitado</div>
+            <div class="user-guest">Sin sesión activa</div>
+          </div>
+        </div>
+        <a routerLink="/login" class="login">
+          <svg width="15" height="15" viewBox="0 0 21 21" fill="none">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
+          Iniciar sesión
+        </a>
+      }
+    </div>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

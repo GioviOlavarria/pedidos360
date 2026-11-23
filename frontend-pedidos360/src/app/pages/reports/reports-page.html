@@ -1,0 +1,132 @@
+<div class="p-page">
+  <header class="p-page-header">
+    <div>
+      <h1 class="p-title">Reportes Financieros y Operativos</h1>
+      <p class="p-subtitle">Métricas de ingresos, ventas por producto y estado de pedidos.</p>
+    </div>
+    <div class="controls">
+      <label for="filter">Criterio:</label>
+      <select id="filter" class="p-input" [value]="filter()" (change)="setFilter($any($event.target).value)">
+        <option value="ACTIVE">Pedidos válidos (sin cancelados)</option>
+        <option value="DELIVERED">Solo pedidos entregados</option>
+        <option value="ALL">Todos los pedidos (incluye cancelados)</option>
+      </select>
+      <button type="button" class="p-btn p-btn-navy" (click)="load()">🔄 Actualizar</button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="p-alert-error block">⚠️ {{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <p class="p-muted">⏳ Calculando reportes financieros y operativos...</p>
+  } @else {
+    <div class="kpis">
+      <div class="kpi"><span>💰</span><strong>{{ stats().totalRevenue | money }}</strong><small>Total Facturado</small></div>
+      <div class="kpi"><span>📦</span><strong>{{ stats().totalOrders }}</strong><small>Pedidos Analizados</small></div>
+      <div class="kpi"><span>🏷️</span><strong>{{ stats().avgTicket | money }}</strong><small>Ticket Promedio</small></div>
+      <div class="kpi"><span>📊</span><strong>{{ stats().totalUnitsSold }}</strong><small>Unidades Vendidas</small></div>
+    </div>
+
+    <div class="charts">
+      <section class="p-card accent">
+        <div class="card-head">
+          <h2 class="p-card-title">Ingresos Mensuales</h2>
+          <span class="hint">Últimos 6 meses</span>
+        </div>
+        <div class="bars">
+          @for (bar of months(); track bar.month) {
+            <div class="bar" [title]="bar.month + ': ' + (bar.value | money)">
+              <div class="bar-value" [class.zero]="bar.value === 0">{{ bar.value | money }}</div>
+              <div class="bar-fill" [class.zero]="bar.value === 0" [style.height.%]="bar.percentage > 4 ? bar.percentage : 4"></div>
+              <span>{{ bar.month }}</span>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="p-card accent">
+        <div class="card-head">
+          <h2 class="p-card-title">Distribución por Estado</h2>
+          <span class="hint">Total pedidos: {{ orders().length }}</span>
+        </div>
+        @for (item of distribution(); track item.status) {
+          <div class="dist">
+            <div class="dist-head">
+              <span>{{ item.label }}</span>
+              <strong [style.color]="item.color">{{ item.count }} ({{ item.percentage }}%)</strong>
+            </div>
+            <div class="p-bar"><div [style.width.%]="item.percentage" [style.background]="item.color"></div></div>
+          </div>
+        }
+      </section>
+    </div>
+
+    <section class="p-card accent">
+      <div class="card-head">
+        <h2 class="p-card-title">Productos Más Vendidos</h2>
+        <span class="hint">Basado en pedidos registrados</span>
+      </div>
+      <table class="p-table">
+        <thead>
+          <tr>
+            <th>Posición</th>
+            <th>Producto</th>
+            <th class="num">Unidades Vendidas</th>
+            <th class="num">Total Generado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of top(); track p.id; let i = $index) {
+            <tr>
+              <td class="rank" [class.first]="i === 0">#{{ i + 1 }}</td>
+              <td class="name">{{ p.name }}</td>
+              <td class="num">{{ p.units }} unidades</td>
+              <td class="num money">{{ p.revenue | money }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="empty">
+                No hay ventas registradas en los pedidos filtrados. Realice compras desde el catálogo para ver datos reflejados.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    @if (streamSales(); as sales) {
+      <section class="p-card accent stream">
+        <div class="card-head">
+          <h2 class="p-card-title">Ventas por Producto (streaming Kafka)</h2>
+          <span class="hint">Tópico pedidos360.orders.events · pedidos vigentes</span>
+        </div>
+        @if (sales.length === 0) {
+          <p class="p-muted">Aún no hay eventos de venta procesados.</p>
+        } @else {
+          <table class="p-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th class="num">Unidades</th>
+                <th class="num">Pedidos</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of sales; track s.productId) {
+                <tr>
+                  <td class="name">{{ s.productName || 'Producto #' + s.productId }}</td>
+                  <td class="num">{{ s.unitsSold }}</td>
+                  <td class="num">{{ s.orders }}</td>
+                  <td class="num money">{{ s.revenue | money }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </section>
+    }
+  }
+</div>

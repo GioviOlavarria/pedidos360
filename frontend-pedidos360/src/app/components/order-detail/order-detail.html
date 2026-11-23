@@ -1,0 +1,92 @@
+<div class="detail">
+  @if (loading()) {
+    <p class="p-muted">Cargando detalle del pedido #{{ orderId() }}...</p>
+  } @else if (error()) {
+    <p class="error">{{ error() }}</p>
+  } @else if (order(); as o) {
+    <div class="header">
+      <div>
+        <h2>Pedido #{{ o.id }}</h2>
+        <span class="date">Registrado el {{ o.createdAt | date: 'dd-MM-yyyy' }} a las {{ o.createdAt | date: 'HH:mm' }}</span>
+      </div>
+      <span class="status" [class.cancelled]="cancelled()">{{ label(o.status) }}</span>
+    </div>
+
+    <!-- Seguimiento -->
+    <div class="box">
+      <h4>Seguimiento de Entrega</h4>
+      @if (cancelled()) {
+        <div class="cancelled-text"><span>❌</span> Pedido cancelado</div>
+      } @else {
+        <div class="timeline">
+          @for (step of steps; track step; let i = $index) {
+            <div class="step" [class.passed]="i <= currentStep()" [class.current]="i === currentStep()">
+              <div class="dot">{{ i < currentStep() ? '✓' : i + 1 }}</div>
+              <span>{{ label(step) }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="rows">
+      <div class="row"><span>Cliente:</span><strong>{{ o.customerName || '#' + o.customerId }}</strong></div>
+      <div class="row"><span>Estado Actual:</span><strong [class.danger]="cancelled()">{{ o.status }}</strong></div>
+    </div>
+
+    <!-- Ítems -->
+    <div class="items">
+      <h4>Artículos en el pedido</h4>
+      @for (item of o.items ?? []; track $index) {
+        <div class="item">
+          <div>
+            <strong>{{ item.productName || 'Producto #' + item.productId }}</strong>
+            <span>x{{ item.quantity }}</span>
+          </div>
+          <span class="amount">{{ item.quantity * item.unitPrice | money }}</span>
+        </div>
+      } @empty {
+        <p class="p-muted small">Sin detalle de ítems registrado.</p>
+      }
+      <div class="total"><span>Total Pagado:</span><strong>{{ o.total | money }}</strong></div>
+    </div>
+
+    <!-- Boleta electrónica SII (llega desde notifications vía Kafka) -->
+    <div class="box receipt">
+      <h4>Boleta electrónica</h4>
+      @if (o.receiptFolio) {
+        <div class="receipt-grid">
+          <span>Folio:</span><strong>N° {{ o.receiptFolio }}</strong>
+          <span>Estado SII:</span><span>{{ o.receiptSiiStatus }}</span>
+          <span>Track ID:</span><span>{{ o.receiptTrackId }}</span>
+          @if (o.receiptIssuedAt) {
+            <span>Emitida:</span><span>{{ o.receiptIssuedAt | date: 'dd-MM-yyyy HH:mm' }}</span>
+          }
+        </div>
+      } @else {
+        <p class="p-muted small">Boleta en emisión; se enviará al correo del cliente.</p>
+      }
+    </div>
+
+    <!-- Acciones del Admin -->
+    @if (isAdmin()) {
+      <div class="admin">
+        <h3>Acciones de Administración</h3>
+        <div class="admin-actions">
+          @if (nextStatus(); as next) {
+            <button type="button" class="p-btn p-btn-navy" (click)="changeStatus(next)">⏩ Avanzar a {{ label(next) }}</button>
+          }
+          @if (o.status === 'CREADO' || o.status === 'ACEPTADO') {
+            <button type="button" class="p-btn p-btn-light" (click)="edit.emit(o)">✏️ Editar Pedido</button>
+          }
+          @if (o.status !== 'ENTREGADO' && o.status !== 'CANCELADO') {
+            <button type="button" class="p-btn p-btn-danger" (click)="changeStatus('CANCELADO')">❌ Cancelar</button>
+          }
+          @if (o.status === 'ENTREGADO') {
+            <div class="done">✅ Pedido completado exitosamente</div>
+          }
+        </div>
+      </div>
+    }
+  }
+</div>

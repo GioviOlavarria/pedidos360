@@ -1,0 +1,87 @@
+<div class="p-page">
+  <header class="header">
+    <div>
+      <h1 class="p-title">Bienvenido, {{ firstName() }} 👋</h1>
+      <p class="p-subtitle">{{ today | date: 'EEEE d MMMM y' }}</p>
+    </div>
+    @if (auth.roles().length > 0) {
+      <span class="role">{{ auth.roles()[0] }}</span>
+    }
+  </header>
+
+  <div class="kpis">
+    @for (kpi of kpis(); track kpi.label) {
+      <div class="kpi">
+        <div class="kpi-icon">{{ kpi.icon }}</div>
+        <div class="kpi-value">{{ loading() ? '…' : kpi.value }}</div>
+        <div class="kpi-label">{{ kpi.label }}</div>
+      </div>
+    }
+  </div>
+
+  <div class="columns">
+    <section class="p-card">
+      <div class="card-head">
+        <h2 class="p-card-title">Pedidos recientes</h2>
+        <a routerLink="/orders" class="see-all">Ver todos →</a>
+      </div>
+      <table class="p-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Estado</th>
+            <th>Total</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (o of recent(); track o.id) {
+            <tr>
+              <td class="muted">#{{ o.id }}</td>
+              <td class="strong">{{ o.customerName || 'Cliente ' + o.customerId }}</td>
+              <td><app-status-badge [status]="o.status" [pill]="true" /></td>
+              <td class="strong">{{ o.total | money }}</td>
+              <td class="muted">{{ o.createdAt | date: 'dd-MM-yyyy' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="empty">{{ loading() ? 'Cargando...' : 'No hay pedidos registrados' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <div class="side">
+      <section class="p-card">
+        <h2 class="p-card-title">Distribución de pedidos</h2>
+        @for (d of distribution(); track d.label) {
+          <div class="dist">
+            <div class="dist-head">
+              <span>{{ d.label }}</span>
+              <strong [style.color]="d.color">{{ d.pct }}%</strong>
+            </div>
+            <div class="p-bar"><div [style.width.%]="d.pct" [style.background]="d.color"></div></div>
+          </div>
+        }
+      </section>
+
+      <section class="shortcuts">
+        <h2>Accesos rápidos</h2>
+        <a routerLink="/orders">
+          <span>📦</span>
+          <div><strong>Gestionar pedidos</strong><small>Ver y actualizar pedidos</small></div>
+        </a>
+        <a routerLink="/catalog">
+          <span>🗂️</span>
+          <div><strong>Ver catálogo</strong><small>Productos y stock</small></div>
+        </a>
+        <a routerLink="/reports">
+          <span>📊</span>
+          <div><strong>Reportes</strong><small>Ingresos y ventas (Kafka)</small></div>
+        </a>
+      </section>
+    </div>
+  </div>
+</div>

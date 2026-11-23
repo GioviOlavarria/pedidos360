@@ -1,0 +1,75 @@
+<div class="login">
+  <!-- Panel izquierdo: marca -->
+  <section class="branding">
+    <div class="circle circle-a"></div>
+    <div class="circle circle-b"></div>
+
+    <div class="logo-block">
+      <div class="logo">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+      </div>
+      <h1>Pedidos<span>360</span></h1>
+      <p>Plataforma de gestión comercial</p>
+    </div>
+
+    <div class="tagline">
+      <h2>Gestiona tus pedidos<br />con total control</h2>
+      <p>Catálogo, seguimiento en tiempo real y<br />gestión de equipos en un solo lugar.</p>
+    </div>
+
+    <div class="stats">
+      @for (stat of stats; track stat.label) {
+        <div>
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Panel derecho: acceso -->
+  <section class="panel">
+    <div class="welcome">
+      <h2>Bienvenido</h2>
+      <p>Ingrese con su cuenta corporativa de Microsoft para continuar.</p>
+    </div>
+
+    @if (authError) {
+      <div class="auth-error">
+        <strong>No se pudo iniciar sesión.</strong><br />
+        {{ authError }}<br />
+        Si usa una cuenta institucional (Duoc), ingrese con el enlace "¿Cuenta institucional?".
+      </div>
+    }
+
+    <div class="divider"></div>
+
+    <button type="button" class="btn-microsoft" (click)="login()">
+      <svg width="22" height="22" viewBox="0 0 21 21" fill="none">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+      </svg>
+      Iniciar sesión con Microsoft
+    </button>
+
+    <a routerLink="/catalog" class="btn-guest"><span>👀</span> Ver catálogo sin iniciar sesión</a>
+
+    <button type="button" class="link-institutional" (click)="loginInstitutional()">
+      ¿Cuenta institucional (Duoc)? Ingresa aquí
+    </button>
+
+    <div class="info">
+      <p><strong>Solo para usuarios autorizados.</strong><br />
+        Si no puede acceder, contacte al administrador de su organización.</p>
+    </div>
+
+    <p class="footer">© 2026 Pedidos360 · Todos los derechos reservados</p>
+  </section>
+</div>

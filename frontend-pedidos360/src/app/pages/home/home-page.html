@@ -1,0 +1,246 @@
+<div class="p-page home">
+  <!-- Bienvenida -->
+  <section class="hero">
+    <div class="hero-circle"></div>
+    <div class="hero-content">
+      <div class="hero-badge"><span>📦</span> Portal de Pedidos y Logística Blue Express</div>
+      <h1>Explora el Catálogo y Rastrea tus Envíos en Tiempo Real</h1>
+      <p>
+        Visualiza y selecciona nuestros productos disponibles, o ingresa el número de tu pedido para consultar el estado
+        de despacho al instante. Sin necesidad obligatoria de iniciar sesión.
+      </p>
+      <div class="hero-actions">
+        <button type="button" class="hero-btn primary" (click)="goTo('products', 'segmento-productos')">
+          <span>🛍️</span> Ver Productos para Seleccionar
+        </button>
+        <button type="button" class="hero-btn ghost" (click)="goTo('tracking', 'segmento-seguimiento')">
+          <span>🔍</span> Hacer Seguimiento a un Pedido
+        </button>
+        @if (!auth.isAuthenticated()) {
+          <a routerLink="/login" class="hero-btn white"><span>🔑</span> Iniciar sesión</a>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Pestañas -->
+  <div class="tabs">
+    <span class="tabs-label">Mostrar vista:</span>
+    @for (tab of tabs; track tab.key) {
+      <button type="button" class="tab" [class.active]="segment() === tab.key" (click)="segment.set(tab.key)">
+        <span>{{ tab.icon }}</span>{{ tab.label }}
+      </button>
+    }
+    <span class="session" [class.on]="auth.isAuthenticated()">
+      {{ auth.isAuthenticated() ? 'Conectado: ' + auth.displayName() : 'Visualizando en Modo Invitado' }}
+    </span>
+  </div>
+
+  <!-- Segmento 1: productos -->
+  @if (segment() !== 'tracking') {
+    <section id="segmento-productos" class="segment">
+      <div class="segment-header">
+        <div>
+          <div class="segment-title">
+            <span class="segment-icon">🛍️</span>
+            <h2>Productos para Seleccionar</h2>
+            <span class="p-tag client-orange">Catálogo Disponible</span>
+          </div>
+          <p class="p-subtitle">Selecciona la cantidad de insumos que necesitas y agrégalos a tu orden de compra.</p>
+        </div>
+        <div class="search">
+          <input type="text" class="p-input" placeholder="Buscar por nombre o descripción..." [value]="search()"
+            (input)="search.set($any($event.target).value)" />
+          <span>🔍</span>
+        </div>
+      </div>
+
+      @if (loadingProducts()) {
+        <div class="state">⏳ Cargando productos disponibles...</div>
+      } @else if (filteredProducts().length === 0) {
+        <div class="state box">No se encontraron productos coincidentes con tu búsqueda.</div>
+      } @else {
+        <div class="grid">
+          @for (p of filteredProducts(); track p.id) {
+            <article class="product">
+              <div>
+                <div class="product-head">
+                  <h3>{{ p.name }}</h3>
+                  <span class="stock" [class.out]="p.stock <= 0">{{ p.stock > 0 ? p.stock + ' un.' : 'Agotado' }}</span>
+                </div>
+                <p class="description">{{ p.description || 'Sin descripción.' }}</p>
+              </div>
+              <div>
+                <div class="figures">
+                  <div>
+                    <div class="figure-label">Precio Unitario</div>
+                    <div class="price">{{ p.price | money }}</div>
+                  </div>
+                  <div class="right">
+                    <div class="figure-label">Subtotal</div>
+                    <div class="subtotal">{{ p.price * qty(p) | money }}</div>
+                  </div>
+                </div>
+                @if (p.stock > 0) {
+                  <div class="buy">
+                    <div class="p-qty">
+                      <span>Cantidad:</span>
+                      <div class="p-qty-controls">
+                        <button type="button" (click)="changeQty(p, -1)" [disabled]="qty(p) <= 1">-</button>
+                        <strong>{{ qty(p) }}</strong>
+                        <button type="button" (click)="changeQty(p, 1)" [disabled]="qty(p) >= p.stock">+</button>
+                      </div>
+                    </div>
+                    <button type="button" class="p-btn p-btn-primary p-btn-block" (click)="select(p)">
+                      <span>🛒</span> Seleccionar ({{ qty(p) }}) · {{ p.price * qty(p) | money }}
+                    </button>
+                  </div>
+                } @else {
+                  <button type="button" class="sold-out" disabled>Agotado Temporalmente</button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  <!-- Segmento 2: seguimiento -->
+  @if (segment() !== 'products') {
+    <section id="segmento-seguimiento" class="segment">
+      <div class="tracking">
+        <div class="segment-title">
+          <span class="segment-icon">📦</span>
+          <h2>Seguimiento de Pedidos y Envíos</h2>
+          <span class="p-tag admin">Rastreo en Vivo</span>
+        </div>
+        <p class="tracking-intro">
+          Ingresa el código o número identificador de tu pedido para visualizar la trazabilidad en tiempo real de tu
+          encomienda Blue Express, desde su creación hasta la entrega en destino.
+        </p>
+
+        <div class="tracking-form">
+          <input type="text" class="tracking-input" placeholder="Ingresa el ID del pedido (ej. 1, 2, 101)..."
+            [value]="trackingId()" (input)="trackingId.set($any($event.target).value)" (keydown.enter)="track()" />
+          <button type="button" class="p-btn p-btn-navy" (click)="track()" [disabled]="loadingTracking()">
+            {{ loadingTracking() ? 'Consultando...' : '🔍 Rastrear Pedido' }}
+          </button>
+        </div>
+
+        <div class="demo">
+          <span>Probar con pedidos de ejemplo:</span>
+          @for (id of demoIds; track id) {
+            <button type="button" (click)="track('' + id)">Pedido #{{ id }}</button>
+          }
+        </div>
+
+        @if (trackingError()) {
+          <div class="p-alert-error">{{ trackingError() }}</div>
+        }
+
+        @if (trackedOrder(); as order) {
+          <div class="result">
+            <div class="result-header">
+              <div>
+                <div class="result-title">
+                  <strong>Pedido #{{ order.id }}</strong>
+                  <app-status-badge [status]="order.status" />
+                </div>
+                <div class="result-meta">
+                  Fecha de emisión: {{ order.createdAt ? (order.createdAt | date: 'dd-MM-yyyy, HH:mm') : 'Reciente' }}
+                  · Destinatario: #{{ order.customerId }}
+                </div>
+              </div>
+              <div class="right">
+                <div class="figure-label">Monto Total</div>
+                <div class="price">{{ order.total | money }}</div>
+              </div>
+            </div>
+
+            <h4 class="steps-title">Trazabilidad del Envío:</h4>
+            @if (order.status === 'CANCELADO') {
+              <div class="cancelled">
+                <span>❌</span>
+                <div>
+                  <strong>Este pedido ha sido cancelado.</strong>
+                  <div>El despacho fue detenido y no continuará en la ruta de distribución.</div>
+                </div>
+              </div>
+            } @else {
+              <div class="steps">
+                @for (step of steps; track step.key; let i = $index) {
+                  <div class="step" [class.done]="i <= currentStep()" [class.current]="i === currentStep()">
+                    <div class="step-icon">{{ i < currentStep() ? '✓' : step.icon }}</div>
+                    <div class="step-label">{{ step.label }}</div>
+                    <div class="step-desc">{{ step.desc }}</div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (order.items?.length) {
+              <div class="items">
+                <h5>Ítems en el envío:</h5>
+                @for (item of order.items; track $index) {
+                  <div class="item">
+                    <span>{{ item.productName || 'Producto ID #' + item.productId }} x {{ item.quantity }} un.</span>
+                    <strong>{{ (item.unitPrice || 0) * (item.quantity || 1) | money }}</strong>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
+</div>
+
+<!-- Confirmación de compra -->
+@if (selected(); as selection) {
+  <div class="p-modal-overlay">
+    <div class="p-modal confirm" role="dialog" aria-modal="true">
+      <div class="confirm-head">
+        <div class="confirm-icon">🛒</div>
+        <h3>Confirmar Selección</h3>
+        <p>{{ selection.product.name }}</p>
+      </div>
+      <div class="p-summary">
+        <div class="p-summary-row"><span>Cantidad seleccionada:</span><strong>{{ selection.quantity }} un.</strong></div>
+        <div class="p-summary-row"><span>Precio unitario:</span><span>{{ selection.product.price | money }}</span></div>
+        <div class="p-summary-total"><span>Total a pagar:</span><strong>{{ selection.product.price * selection.quantity | money }}</strong></div>
+      </div>
+      @if (!auth.isAuthenticated()) {
+        <div class="guest-info">
+          ℹ️ <strong>Modo Invitado:</strong> Para registrar el despacho a tu dirección y emitir la orden en el sistema
+          corporativo, inicia sesión con tu cuenta de Microsoft.
+        </div>
+      }
+      <div class="confirm-actions">
+        <button type="button" class="p-btn p-btn-secondary" (click)="selected.set(null)">Cancelar</button>
+        <button type="button" class="p-btn p-btn-primary wide" (click)="confirmPurchase()" [disabled]="purchasing()">
+          {{ purchasing() ? 'Procesando...' : auth.isAuthenticated() ? 'Confirmar Compra' : 'Iniciar sesión y Comprar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Compra exitosa -->
+@if (purchased(); as order) {
+  <div class="p-modal-overlay">
+    <div class="p-modal confirm center" role="dialog" aria-modal="true">
+      <div class="ok-icon">✓</div>
+      <h3>¡Pedido Creado con Éxito!</h3>
+      <p class="ok-text">
+        Tu orden ha sido registrada bajo el ID <strong>#{{ order.id }}</strong> por un total de
+        <strong>{{ order.total | money }}</strong>. La boleta electrónica llegará a tu correo.
+      </p>
+      <div class="confirm-actions">
+        <button type="button" class="p-btn p-btn-navy grow" (click)="trackPurchased()">🔍 Rastrear este pedido</button>
+        <button type="button" class="p-btn p-btn-secondary grow" (click)="purchased.set(null)">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}

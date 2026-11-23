@@ -1,0 +1,52 @@
+<div class="p-modal-overlay">
+  <div class="p-modal" role="dialog" aria-modal="true">
+    <div class="p-modal-header">
+      <h2>{{ order() ? 'Editar Pedido #' + order()!.id : 'Nuevo Pedido' }}</h2>
+      <button type="button" class="p-modal-close" (click)="closed.emit(false)" aria-label="Cerrar">✕</button>
+    </div>
+
+    <form class="p-modal-body" (ngSubmit)="submit()">
+      @if (error()) {
+        <p class="p-form-error">{{ error() }}</p>
+      }
+
+      <div class="p-field">
+        <label class="p-label" for="customerId">ID Cliente</label>
+        <input id="customerId" name="customerId" type="number" class="p-input" placeholder="Ej. 101" min="1"
+          [ngModel]="customerId()" (ngModelChange)="customerId.set($event)" required />
+      </div>
+
+      <div class="p-field">
+        <label class="p-label" for="product">Agregar Producto</label>
+        <select #productSelect id="product" class="p-input" (change)="addProduct(productSelect)">
+          <option value="" selected disabled>-- Seleccione un producto --</option>
+          @for (p of products(); track p.id) {
+            <option [value]="p.id">{{ p.name }} ({{ p.price | money }}) - Stock: {{ p.stock }}</option>
+          }
+        </select>
+      </div>
+
+      @if (lines().length > 0) {
+        <div class="lines">
+          <h4>Items del Pedido</h4>
+          @for (line of lines(); track line.product.id) {
+            <div class="line">
+              <span>{{ line.product.name }}</span>
+              <input type="number" min="1" class="p-input" [value]="line.quantity"
+                (change)="setQuantity(line.product.id, +$any($event.target).value)" />
+              <button type="button" class="remove" (click)="removeLine(line.product.id)" aria-label="Quitar">✕</button>
+            </div>
+          }
+          <div class="total">Total: {{ total() | money }}</div>
+        </div>
+      }
+
+      <div class="p-modal-actions">
+        <button type="button" class="p-btn p-btn-secondary" (click)="closed.emit(false)">Cancelar</button>
+        <button type="submit" class="p-btn p-btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Guardando...' : order() ? 'Guardar Cambios' : 'Crear Pedido' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

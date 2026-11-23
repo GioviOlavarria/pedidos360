@@ -1,0 +1,46 @@
+<article class="card" [class.admin]="isAdmin()">
+  <div>
+    <div class="head">
+      <h3>{{ product().name }}</h3>
+      <span class="stock" [style.background]="stock().background" [style.color]="stock().color">{{ stock().text }}</span>
+    </div>
+    <p class="description">{{ product().description || 'Sin descripción detallada.' }}</p>
+  </div>
+
+  <div>
+    <div class="figures">
+      <div>
+        <div class="figure-label">Precio Unitario</div>
+        <div class="price">{{ product().price | money }}</div>
+      </div>
+      <div class="right">
+        <div class="figure-label">Disponible</div>
+        <div class="units">{{ product().stock }} un.</div>
+      </div>
+    </div>
+
+    @if (isAdmin()) {
+      <div class="admin-actions">
+        <button type="button" class="p-btn p-btn-light" (click)="edit.emit(product())">✏️ Editar</button>
+        <button type="button" class="p-btn p-btn-danger" (click)="remove.emit(product())">🗑️ Eliminar</button>
+      </div>
+    } @else if (product().stock > 0) {
+      <div class="buy">
+        <div class="p-qty">
+          <span>Cantidad:</span>
+          <div class="p-qty-controls">
+            <button type="button" (click)="decrease()" [disabled]="quantity() <= 1">-</button>
+            <strong>{{ quantity() }}</strong>
+            <button type="button" (click)="increase()" [disabled]="quantity() >= product().stock">+</button>
+          </div>
+        </div>
+        <button type="button" class="p-btn p-btn-primary p-btn-block"
+          (click)="buy.emit({ product: product(), quantity: quantity() })">
+          🛒 Comprar {{ quantity() > 1 ? '(' + quantity() + ')' : '' }} · {{ product().price * quantity() | money }}
+        </button>
+      </div>
+    } @else {
+      <button type="button" class="sold-out" disabled>Agotado temporalmente</button>
+    }
+  </div>
+</article>

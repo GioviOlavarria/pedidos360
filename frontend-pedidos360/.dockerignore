@@ -25,3 +25,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Archivo generado en el build a partir de los build args
+src/environments/environment.ts
+
+# Caché de Angular
+.angular/

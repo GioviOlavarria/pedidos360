@@ -246,12 +246,13 @@ services:
     build:
       context: ../frontend-pedidos360
       dockerfile: Dockerfile
+      # Frontend Angular: los valores se incrustan en el bundle al compilar (scripts/set-env.mjs).
       args:
-        VITE_BFF_URL:              ${VITE_BFF_URL}
-        VITE_AZURE_AD_CLIENT_ID:   ${AZURE_AD_CLIENT_ID}
-        VITE_AZURE_AD_TENANT_ID:   ${AZURE_AD_TENANT_ID}
-        VITE_API_CLIENT_ID:        ${API_CLIENT_ID}
-        VITE_ADMIN_EMAIL:          ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
+        BFF_URL:            ${BFF_URL:-${VITE_BFF_URL:-http://localhost:8080}}
+        AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+        AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID}
+        API_CLIENT_ID:      ${API_CLIENT_ID}
+        ADMIN_EMAILS:       ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
     container_name: pedidos360-frontend
     restart: unless-stopped
     depends_on:

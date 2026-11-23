@@ -2,19 +2,18 @@
 
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=java)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?logo=spring-boot)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
-![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite)
+![Angular](https://img.shields.io/badge/Angular-21-DD0031?logo=angular)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
 ![Azure AD](https://img.shields.io/badge/Azure_Active_Directory-0078D4?logo=microsoft-azure)
 
-Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrollada con arquitectura de microservicios usando **Spring Boot (WebFlux / MVC)**, **React** y protegida corporativamente a través de **Microsoft Entra ID (Azure AD)**.
+Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrollada con arquitectura de microservicios usando **Spring Boot (WebFlux / MVC)**, **Angular** y protegida corporativamente a través de **Microsoft Entra ID (Azure AD)**.
 
 ## Características
 - **Arquitectura BFF (Backend For Frontend)**: Patrón que canaliza las llamadas del cliente de forma reactiva (Spring WebFlux).
 - **Catálogo y Órdenes Independientes**: Microservicios separados para la gestión de productos e inventario, y para el flujo completo de compras.
-- **Autenticación Corporativa**: Integración nativa con Azure AD mediante MSAL-Browser y Spring Security OAuth2 (Roles: `Admin`, `Operator`, `Customer`).
-- **Diseño Moderno (UI/UX)**: Interfaz de usuario optimizada inspirada en paneles de control logísticos de primer nivel, responsive y rápida (Vite + React).
-- **Despliegue unificado con Docker**: Microservicios Java, frontend React/Nginx, MySQL, RabbitMQ y Kafka orquestados con `docker compose`.
+- **Autenticación Corporativa**: Integración nativa con Azure AD mediante MSAL (Angular) y Spring Security OAuth2 (Roles: `Admin`, `Operator`, `Customer`).
+- **Diseño Moderno (UI/UX)**: Interfaz de usuario optimizada inspirada en paneles de control logísticos de primer nivel, responsive y modular (Angular standalone, signals y carga diferida de páginas).
+- **Despliegue unificado con Docker**: Microservicios Java, frontend Angular/Nginx, MySQL, RabbitMQ y Kafka orquestados con `docker compose`.
 - **Integración Continua (CI/CD)**: Flujos automatizados con GitHub Actions para asegurar compilaciones limpias.
 
 ---
@@ -23,7 +22,7 @@ Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrol
 
 ```text
                      [Nginx]
-[Navegador]  <---->  Frontend (React SPA)  (Puerto 3000)
+[Navegador]  <---->  Frontend (Angular SPA)  (Puerto 3000)
     | (JWT)
     v
 [BFF Gateway] <--->  ms-pedidos360-bff (WebFlux) (Puerto 8080)
@@ -69,7 +68,7 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
    ```
    Abre el archivo `.env` y rellena con los credenciales de Microsoft Entra ID y las credenciales que desees usar para tu base de datos MySQL virtual (ej: `RootPedidos2024!`). 
    
-   *(Importante: Si ejecutas el código localmente, la variable `VITE_BFF_URL` debe ser `http://localhost:8080`)*.
+   *(La variable `BFF_URL` es la URL del BFF que usará el navegador: `http://localhost:8080` en local. Por compatibilidad también se acepta `VITE_BFF_URL`).*
 
 3. **Inicia los servicios**:
    Estando en la carpeta `infra`, ejecuta el comando de Docker Compose:
@@ -107,7 +106,7 @@ El rol lo decide el **backend** a partir del token (claim `preferred_username`/`
    - *Expose an API*: scope `access_as_user`, y agregar el client id del frontend como *Authorized client application*.
    - *Manifest*: `"requestedAccessTokenVersion": 2` (obligatorio para cuentas personales).
    - *Token configuration*: agregar los optional claims `email` y `preferred_username` al **access token** (el backend los usa para saber quién compra, a qué correo enviar la boleta y si es Admin).
-2. **App Registration del frontend** (`AZURE_AD_CLIENT_ID`): mismo tipo de cuentas, plataforma *SPA* con redirect URI `http://localhost:3000/auth/callback` (y `http://localhost:5173/auth/callback` para desarrollo con Vite), y permiso delegado al scope `access_as_user` de la API.
+2. **App Registration del frontend** (`AZURE_AD_CLIENT_ID`): mismo tipo de cuentas, plataforma *SPA* con redirect URI `http://localhost:3000/auth/callback` (y `http://localhost:5173/auth/callback` para desarrollo con `npm start`), y permiso delegado al scope `access_as_user` de la API.
 
 El backend valida que cada token haya sido emitido **para esta API** (`aud`) por el tenant indicado en el propio token (`tid`/`iss`).
 
@@ -198,12 +197,37 @@ Clientes en el host: `localhost:9092,localhost:9093`. Entre contenedores: `kafka
 
 La API REST real del SII (`apicert.sii.cl` en certificación y `api.sii.cl` en producción, con el flujo semilla → token → envío → consulta por track ID) exige el **certificado digital** del contribuyente, **folios CAF** autorizados y la **certificación** de la empresa ante el SII. Para conectarla basta con agregar otra implementación de `SiiClient` y activarla con `SII_MODE`.
 
+## Frontend Angular
+
+Código en `frontend-pedidos360` (Angular 21, standalone + signals):
+
+| Carpeta | Contenido |
+| --- | --- |
+| `src/app/core/auth` | `AuthService` (sesión MSAL), `roleGuard` (acceso por rol), `authInterceptor` (adjunta el JWT al BFF) |
+| `src/app/core/api` | `CatalogService`, `OrdersService` (HttpClient → BFF) |
+| `src/app/layout` | Barra lateral con menú según rol |
+| `src/app/pages` | Inicio, catálogo, login, panel, pedidos y reportes (carga diferida) |
+| `src/app/components` | Tarjeta y formulario de producto; lista, detalle y formulario de pedido |
+
+**Flujo de login (IDaaS):** el botón *Iniciar sesión con Microsoft* hace `loginRedirect` a Entra ID → Microsoft vuelve a `/auth/callback` → `AuthService.initialize()` (al arrancar la app) procesa la respuesta → el Admin va a `/dashboard` y el cliente a `/`. En cada llamada al BFF, `authInterceptor` obtiene el access token con `acquireTokenSilent` y lo envía como `Authorization: Bearer <JWT>`; el backend lo valida en cada microservicio.
+
+Desarrollo local (requiere Node 22.12+ o 24+):
+
+```bash
+cd frontend-pedidos360
+cp .env.local.example .env.local   # completar AZURE_AD_CLIENT_ID, AZURE_AD_TENANT_ID, API_CLIENT_ID
+npm install
+npm start        # http://localhost:5173
+npm test         # pruebas unitarias (Vitest)
+npm run build    # build de producción en dist/
+```
+
 ## Tecnologías Utilizadas
 
 ### Frontend
-* React 19, React Router DOM v7
-* Vite 8, Axios
-* @azure/msal-browser, @azure/msal-react (Auth)
+* Angular 21 (componentes standalone, signals, Router con guards por rol, HttpClient con interceptor JWT)
+* @azure/msal-browser (login con Microsoft Entra ID y access token para el BFF)
+* Bootstrap 5, Vitest (pruebas unitarias)
 * Nginx (Web server en Docker)
 
 ### Backend
