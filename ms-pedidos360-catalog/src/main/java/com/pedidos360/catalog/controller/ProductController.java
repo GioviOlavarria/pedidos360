@@ -2,8 +2,10 @@ package com.pedidos360.catalog.controller;
 
 import com.pedidos360.catalog.dto.ProductRequest;
 import com.pedidos360.catalog.dto.ProductResponse;
+import com.pedidos360.catalog.dto.ProductSalesResponse;
 import com.pedidos360.catalog.entity.Product;
 import com.pedidos360.catalog.service.ProductService;
+import com.pedidos360.catalog.service.SalesProjectionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 
@@ -20,6 +22,15 @@ import java.util.stream.Collectors;
 public class ProductController {
     @Autowired
     private ProductService productService;
+
+    @Autowired
+    private SalesProjectionService salesProjectionService;
+
+    /** Productos más vendidos (Admin), calculado con los eventos de pedidos recibidos por Kafka. */
+    @GetMapping("/sales-stats")
+    public ResponseEntity<List<ProductSalesResponse>> salesStats() {
+        return ResponseEntity.ok(salesProjectionService.salesByProduct());
+    }
 
     @PostMapping
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
