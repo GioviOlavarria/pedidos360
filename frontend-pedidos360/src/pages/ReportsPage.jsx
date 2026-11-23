@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getOrders } from '../services/ordersService';
-import { getProducts } from '../services/catalogService';
+import { getProducts, getSalesStats } from '../services/catalogService';
 import { formatMoney } from '../utils/userUtils';
 
 const NAVY = '#003087';
@@ -31,6 +31,7 @@ function ReportsPage() {
   const [error, setError] = useState('');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [streamSales, setStreamSales] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ACTIVE'); // 'ACTIVE', 'DELIVERED', 'ALL'
 
   const loadData = () => {
@@ -46,6 +47,10 @@ function ReportsPage() {
         setError('No se pudieron obtener las métricas del servidor. Asegúrese de que el backend esté en ejecución.');
       })
       .finally(() => setLoading(false));
+    // Estadística calculada por catalog a partir de los eventos Kafka; si falla, el resto del reporte sigue.
+    getSalesStats()
+      .then(res => setStreamSales(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setStreamSales(null));
   };
 
   useEffect(() => {
@@ -361,6 +366,40 @@ function ReportsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ── Ventas por producto en streaming (Kafka -> catalog) ─────────── */}
+      {streamSales && (
+        <div style={{ ...cardStyle, marginTop: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={cardTitleStyle}>Ventas por Producto (streaming Kafka)</h2>
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Tópico pedidos360.orders.events · pedidos vigentes</span>
+          </div>
+          {streamSales.length === 0 ? (
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.88rem' }}>Aún no hay eventos de venta procesados.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #f1f5f9', color: '#94a3b8', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                  <th style={{ textAlign: 'left', padding: '10px 12px' }}>Producto</th>
+                  <th style={{ textAlign: 'right', padding: '10px 12px' }}>Unidades</th>
+                  <th style={{ textAlign: 'right', padding: '10px 12px' }}>Pedidos</th>
+                  <th style={{ textAlign: 'right', padding: '10px 12px' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {streamSales.map(p => (
+                  <tr key={p.productId} style={{ borderBottom: '1px solid #f8fafc' }}>
+                    <td style={{ padding: '12px', color: NAVY, fontWeight: '600' }}>{p.productName || `Producto #${p.productId}`}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: '#475569' }}>{p.unitsSold}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: '#475569' }}>{p.orders}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: ORANGE, fontWeight: '700' }}>{formatMoney(p.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
     </div>
   );

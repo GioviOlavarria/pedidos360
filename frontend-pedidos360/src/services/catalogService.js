@@ -56,3 +56,11 @@ export function decreaseStock(id, quantity) {
 export function deleteProduct(id) {
   return apiClient.delete(`${BASE}/${id}`);
 }
+
+/**
+ * Productos más vendidos (solo Admin). El catálogo lo calcula con los eventos de pedidos de Kafka.
+ * @returns {Promise<import('axios').AxiosResponse>}
+ */
+export function getSalesStats() {
+  return apiClient.get(`${BASE}/sales-stats`);
+}

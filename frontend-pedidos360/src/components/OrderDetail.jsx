@@ -192,6 +192,28 @@ function OrderDetail({ orderId, onStatusChanged, onEdit }) {
         </div>
       </div>
 
+      {/* ── Boleta electrónica SII (llega desde notifications vía Kafka) ── */}
+      <div style={{ marginBottom: '24px', background: '#f8fafc', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.84rem' }}>
+        <h4 style={{ margin: '0 0 8px', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
+          Boleta electrónica
+        </h4>
+        {order.receiptFolio ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', color: NAVY }}>
+            <span style={{ color: '#64748b' }}>Folio:</span><strong>N° {order.receiptFolio}</strong>
+            <span style={{ color: '#64748b' }}>Estado SII:</span><span>{order.receiptSiiStatus}</span>
+            <span style={{ color: '#64748b' }}>Track ID:</span><span>{order.receiptTrackId}</span>
+            {order.receiptIssuedAt && (
+              <>
+                <span style={{ color: '#64748b' }}>Emitida:</span>
+                <span>{new Date(order.receiptIssuedAt).toLocaleString()}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: '#94a3b8' }}>Boleta en emisión; se enviará al correo del cliente.</p>
+        )}
+      </div>
+
       {/* ── Acciones (Solo para Admin / Operador) ────────────────────── */}
       {isAdmin && (
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>

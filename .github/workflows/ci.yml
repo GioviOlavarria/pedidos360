@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [ ms-pedidos360-bff, ms-pedidos360-catalog, ms-pedidos360-orders, ms-pedidos360-notifications, ms-pedidos360-kafka-admin ]
+        service: [ ms-pedidos360-bff, ms-pedidos360-catalog, ms-pedidos360-orders, ms-pedidos360-notifications, ms-pedidos360-kafka-admin, ms-pedidos360-rabbit-admin ]
 
     steps:
     - name: Checkout code

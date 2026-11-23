@@ -1,12 +1,14 @@
 name: pedidos360
 
+# ── Plantillas del clúster Kafka (ZooKeeper + 2 brokers) ──────────────────────
 x-kafka-broker: &kafka-broker
   image: confluentinc/cp-kafka:7.9.11
   restart: unless-stopped
   depends_on:
     zookeeper:
       condition: service_healthy
-  networks: [kafka-net]
+  networks:
+    - pedidos360-net
   healthcheck:
     test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:29092", "--list"]
     interval: 10s
@@ -16,6 +18,7 @@ x-kafka-broker: &kafka-broker
 
 x-kafka-environment: &kafka-environment
   KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  # INTERNAL: tráfico entre contenedores; EXTERNAL: clientes en el host (localhost:9092/9093).
   KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
   KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
   KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
@@ -25,10 +28,16 @@ x-kafka-environment: &kafka-environment
   KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
   KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
   KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  # Con 2 réplicas, min ISR 1 permite seguir escribiendo (acks=all) si cae un broker.
   KAFKA_MIN_INSYNC_REPLICAS: 1
+  # Los tópicos se crean explícitamente (kafka-init / NewTopic) con su configuración.
   KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
   KAFKA_DELETE_TOPIC_ENABLE: "true"
+  KAFKA_LOG_RETENTION_HOURS: 168
 
+x-kafka-client-env: &kafka-client-env
+  KAFKA_ENABLED: "true"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29092
 services:
 
   mysql:
@@ -52,7 +61,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-
   # ── Cluster RabbitMQ de 3 nodos ─────────────────────────────────────────────
   # Las colas del flujo de boletas son quorum: se replican en los 3 nodos.
   rabbitmq1:
@@ -64,13 +72,15 @@ services:
       RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-pedidos360cookie}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-pedidos360}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-pedidos360rabbit}
+    volumes:
+      - ./rabbitmq/cluster.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
     ports:
       - "5672:5672"
       - "15672:15672"
     networks:
-      - rabbitmq-net
+      - pedidos360-net
     healthcheck: &rabbit-health
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      test: rabbitmq-diagnostics -q ping
       interval: 15s
       timeout: 10s
       retries: 10
@@ -86,9 +96,9 @@ services:
       - ./rabbitmq/cluster.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
     depends_on:
       rabbitmq1:
-        condition: service_started
+        condition: service_healthy
     networks:
-      - rabbitmq-net
+      - pedidos360-net
     healthcheck: *rabbit-health
 
   rabbitmq3:
@@ -101,10 +111,31 @@ services:
       - ./rabbitmq/cluster.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
     depends_on:
       rabbitmq1:
-        condition: service_started
+        condition: service_healthy
     networks:
-      - rabbitmq-net
+      - pedidos360-net
     healthcheck: *rabbit-health
+
+  # API REST para crear/eliminar colas, exchanges y bindings del clúster RabbitMQ (puerto 8086).
+  rabbit-admin:
+    build:
+      context: ../ms-pedidos360-rabbit-admin
+      dockerfile: Dockerfile
+    container_name: pedidos360-rabbit-admin
+    restart: unless-stopped
+    depends_on:
+      rabbitmq1:
+        condition: service_healthy
+    environment:
+      RABBIT_ADMIN_BIND_ADDRESS: 0.0.0.0
+      RABBITMQ_ADDRESSES: rabbitmq1:5672,rabbitmq2:5672,rabbitmq3:5672
+      RABBITMQ_USER:     ${RABBITMQ_USER:-pedidos360}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-pedidos360rabbit}
+      RABBITMQ_MANAGEMENT_URL: http://rabbitmq1:15672
+    ports:
+      - "127.0.0.1:${RABBIT_ADMIN_PORT:-8086}:8086"
+    networks:
+      - pedidos360-net
 
   orders:
     build:
@@ -113,6 +144,8 @@ services:
     container_name: pedidos360-orders
     restart: unless-stopped
     depends_on:
+      kafka-init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       catalog:
@@ -123,12 +156,9 @@ services:
         condition: service_healthy
       rabbitmq3:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
     environment:
+      <<: *kafka-client-env
       SPRING_PROFILES_ACTIVE: docker
-      KAFKA_ENABLED: "true"
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29092
       DB_URL:         ${DB_URL:-jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
       DB_USER:        ${DB_USER:-pedidos360user}
       DB_PASSWORD:    ${DB_PASSWORD:-pedidos360pass}
@@ -144,8 +174,6 @@ services:
       - "8081:8081"
     networks:
       - pedidos360-net
-      - rabbitmq-net
-      - kafka-net
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
       interval: 15s
@@ -160,9 +188,12 @@ services:
     container_name: pedidos360-catalog
     restart: unless-stopped
     depends_on:
+      kafka-init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
     environment:
+      <<: *kafka-client-env
       SPRING_PROFILES_ACTIVE: docker
       DB_URL:         ${DB_URL:-jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
       DB_USER:        ${DB_USER:-pedidos360user}
@@ -230,7 +261,7 @@ services:
       - "3000:80"
     networks:
       - pedidos360-net
-  
+
   notifications:
     build:
       context: ../ms-pedidos360-notifications
@@ -238,20 +269,19 @@ services:
     container_name: pedidos360-notifications
     restart: unless-stopped
     depends_on:
+      kafka-init:
+        condition: service_completed_successfully
       rabbitmq1:
         condition: service_healthy
       rabbitmq2:
         condition: service_healthy
       rabbitmq3:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
       mailhog:
         condition: service_started
     environment:
+      <<: *kafka-client-env
       SPRING_PROFILES_ACTIVE: docker
-      KAFKA_ENABLED: "true"
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29092
       RABBITMQ_ADDRESSES: rabbitmq1:5672,rabbitmq2:5672,rabbitmq3:5672
       RABBITMQ_USER:     ${RABBITMQ_USER:-pedidos360}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-pedidos360rabbit}
@@ -264,12 +294,13 @@ services:
       MAIL_SMTP_AUTH:     ${MAIL_SMTP_AUTH:-false}
       MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-false}
       MAIL_FROM:          ${MAIL_FROM:-Pedidos360 <noreply@pedidos360.com>}
+      # Boleta electrónica: modo simulado del SII (ver ms-pedidos360-notifications/sii).
+      SII_MODE:           ${SII_MODE:-simulado}
+      SII_RUT_EMISOR:     ${SII_RUT_EMISOR:-76123456-7}
     ports:
       - "8083:8083"
     networks:
       - pedidos360-net
-      - rabbitmq-net
-      - kafka-net
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
       interval: 15s
@@ -287,8 +318,10 @@ services:
     networks:
       - pedidos360-net
 
+  # ── Clúster Kafka: ZooKeeper + 2 brokers ────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.9.11
+    container_name: pedidos360-zookeeper
     restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -296,7 +329,8 @@ services:
     volumes:
       - kafka-zookeeper-data:/var/lib/zookeeper/data
       - kafka-zookeeper-log:/var/lib/zookeeper/log
-    networks: [kafka-net]
+    networks:
+      - pedidos360-net
     healthcheck:
       test: ["CMD", "cub", "zk-ready", "localhost:2181", "5"]
       interval: 10s
@@ -306,6 +340,8 @@ services:
 
   kafka:
     <<: *kafka-broker
+    container_name: pedidos360-kafka1
+    hostname: kafka
     environment:
       <<: *kafka-environment
       KAFKA_BROKER_ID: 1
@@ -317,6 +353,8 @@ services:
 
   kafka2:
     <<: *kafka-broker
+    container_name: pedidos360-kafka2
+    hostname: kafka2
     environment:
       <<: *kafka-environment
       KAFKA_BROKER_ID: 2
@@ -326,25 +364,29 @@ services:
     volumes:
       - kafka-2-data:/var/lib/kafka/data
 
+  # Crea (o alinea) los tópicos de la aplicación con su configuración. Ver infra/kafka/create-topics.sh.
   kafka-init:
     image: confluentinc/cp-kafka:7.9.11
+    container_name: pedidos360-kafka-init
     depends_on:
       kafka:
         condition: service_healthy
       kafka2:
         condition: service_healthy
-    networks: [kafka-net]
-    entrypoint: ["/bin/bash", "-ec"]
-    command:
-      - >-
-        kafka-topics --bootstrap-server kafka:29092,kafka2:29092 --create --if-not-exists
-        --topic pedidos360.orders.created --partitions 3 --replication-factor 2
-        && kafka-topics --bootstrap-server kafka:29092,kafka2:29092 --create --if-not-exists
-        --topic pedidos360.notifications.receipt-sent --partitions 3 --replication-factor 2
+    environment:
+      BOOTSTRAP: kafka:29092,kafka2:29092
+    volumes:
+      - ./kafka/create-topics.sh:/scripts/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/scripts/create-topics.sh"]
+    networks:
+      - pedidos360-net
 
+  # API REST para administrar tópicos, configuraciones, brokers y consumer groups (puerto 8084).
   kafka-admin:
     build:
       context: ../ms-pedidos360-kafka-admin
+      dockerfile: Dockerfile
+    container_name: pedidos360-kafka-admin
     restart: unless-stopped
     depends_on:
       kafka-init:
@@ -354,7 +396,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29092
     ports:
       - "127.0.0.1:${KAFKA_ADMIN_PORT:-8084}:8084"
-    networks: [kafka-net]
+    networks:
+      - pedidos360-net
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/api/brokers"]
       interval: 10s
@@ -362,8 +405,10 @@ services:
       retries: 10
       start_period: 20s
 
+  # Kafka UI: brokers, tópicos, mensajes y consumer groups (http://localhost:8085).
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
+    container_name: pedidos360-kafka-ui
     restart: unless-stopped
     depends_on:
       kafka-init:
@@ -374,7 +419,9 @@ services:
       KAFKA_CLUSTERS_0_NAME: pedidos360-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092,kafka2:29092
       KAFKA_CLUSTERS_0_READONLY: "false"
-    networks: [kafka-net]
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - pedidos360-net
 
 volumes:
   kafka-zookeeper-data:
@@ -384,7 +431,5 @@ volumes:
   mysql-data:
     driver: local
 networks:
-  rabbitmq-net:
-  kafka-net:
   pedidos360-net:
     driver: bridge
