@@ -31,6 +31,15 @@ Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrol
     +-----> [API] ms-pedidos360-catalog (Puerto 8082) ---> [BD MySQL]
     |
     +-----> [API] ms-pedidos360-orders  (Puerto 8081) ---> [BD MySQL]
+
+Mensajería
+  RabbitMQ (3 nodos, colas quorum + DLQ)  orders --order.created--> notifications (boleta por correo)
+  Kafka (ZooKeeper + 2 brokers)           orders --pedidos360.orders.events--> catalog, notifications
+                                          notifications --pedidos360.billing.receipts--> orders
+Administración
+  ms-pedidos360-kafka-admin  (8084)  tópicos, configuraciones, brokers y consumer groups
+  ms-pedidos360-rabbit-admin (8086)  colas, exchanges y bindings
+  Kafka UI (8085) · RabbitMQ Management (15672) · MailHog (8025)
 ```
 
 ---
@@ -77,6 +86,7 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
    - Panel de RabbitMQ: `http://localhost:15672`
    - Panel de Kafka UI: `http://localhost:8085`
    - API de administración de Kafka: `http://localhost:8084/api/topics`
+   - API de administración de RabbitMQ: `http://localhost:8086/api/queues`
 
 ---
 
@@ -114,53 +124,79 @@ Cliente compra ──> BFF ──> orders ──(reserva stock, precios reales)�
 ```
 
 - El total y los precios se calculan en el servidor con los datos del catálogo; el stock se descuenta de forma atómica.
+- Antes de enviar el correo, notifications emite la **boleta electrónica (DTE 39)** a través del puerto `SiiClient` (ver más abajo). El correo incluye folio, neto, IVA (19 %), timbre y track ID.
 - Si el envío del correo falla, se reintenta 4 veces y luego el mensaje queda en `pedidos360.notifications.boleta.dlq`.
 - Por defecto los correos van a **MailHog**: ábrelos en `http://localhost:8025`. Para enviar correos reales, configura las variables `MAIL_*` en `infra/.env` (ver `infra/.env.example`).
 - Panel de RabbitMQ: `http://localhost:15672` (usuario/clave `RABBITMQ_USER` / `RABBITMQ_PASSWORD`).
 
-## Kafka y RabbitMQ en Docker
+## Kafka: streaming de eventos
 
-Desde `infra` puedes elegir qué servicios del mismo `docker-compose.yml` levantar.
+Kafka **complementa** a RabbitMQ sin reemplazarlo: RabbitMQ sigue siendo la cola de trabajo de la boleta (un mensaje, un consumidor, DLQ), mientras Kafka guarda el **historial de eventos** del pedido para que varios servicios lo lean de forma independiente (analítica y reacciones), con retención y posibilidad de reprocesar.
 
-| Componente | Comando |
+### Tópicos
+
+| Tópico | Productor | Consumer groups | Particiones / réplicas | Configuración |
+| --- | --- | --- | --- | --- |
+| `pedidos360.orders.events` | `orders` (CREATED, UPDATED, STATUS_CHANGED, DELETED) | `pedidos360-catalog-sales` (catalog), `pedidos360-notifications` (notifications) | 3 / 2 | `cleanup.policy=delete`, `retention.ms` = 7 días, `min.insync.replicas=1` |
+| `pedidos360.billing.receipts` | `notifications` (boleta emitida) | `pedidos360-orders` (orders) | 3 / 2 | `cleanup.policy=compact` (última boleta por pedido), `min.compaction.lag.ms` = 1 min, `segment.ms` = 1 h |
+| `*.DLT` | error handler de cada consumidor | revisión manual | 1 / 2 | `cleanup.policy=delete`, `retention.ms` = 30 días |
+
+- **Clave = id del pedido**: todos los eventos de un pedido van a la misma partición y se consumen en orden.
+- **DTO JSON** (`OrderEventMessage`, `ReceiptIssuedMessage`) con `JsonSerializer` y `ErrorHandlingDeserializer` + `JsonDeserializer`.
+- **Productores**: `acks=all`, idempotencia, compresión lz4 y publicación después del commit (`@TransactionalEventListener(AFTER_COMMIT)`).
+- **Consumer groups**: catalog y notifications leen el mismo tópico con grupos distintos (cada uno recibe todo y cumple su responsabilidad). Dentro de cada grupo, 3 hilos (`concurrency=3`) se reparten las 3 particiones con `CooperativeStickyAssignor`; si se levantan más instancias, Kafka rebalancea las particiones entre ellas.
+- **Manejo de errores**: validación del payload (Bean Validation y clave = orderId) y `DefaultErrorHandler` con 3 reintentos y backoff exponencial (1 s, 2 s, 4 s); luego el registro va a `<tópico>.DLT` con los headers de la excepción. Los payloads inválidos o no deserializables van directo al DLT sin bloquear la partición. Los logs incluyen tópico, partición, offset y clave.
+- **Lógica separada de la mensajería**: los `@KafkaListener` solo validan y delegan (`OrderService.registerReceipt`, `SalesProjectionService`, `OrderStatusMailService`).
+- Los tópicos se crean con `infra/kafka/create-topics.sh` (servicio `kafka-init`) y además cada servicio los declara como `NewTopic` (`KafkaAdmin` con `modify-topic-configs`).
+
+Qué hace cada consumidor:
+- **catalog** proyecta las ventas por producto de los pedidos vigentes (`GET /api/catalog/sales-stats`, solo Admin; se ve en *Reportes*). Es idempotente: cada evento reemplaza las líneas de su pedido.
+- **notifications** avisa por correo al cliente cada cambio de estado del pedido.
+- **orders** guarda en el pedido el folio, el track ID y el estado SII de la boleta (se ve en el detalle del pedido).
+
+### Levantar solo Kafka o solo RabbitMQ
+
+| Componente | Comando (desde `infra`) |
 | --- | --- |
-| RabbitMQ, tres nodos | `docker compose up -d --wait rabbitmq1 rabbitmq2 rabbitmq3` |
-| Kafka, ZooKeeper, dos brokers y API de administración | `docker compose up -d --build --wait kafka-admin` |
-| Kafka UI con el clúster de Kafka | `docker compose up -d --wait kafka-ui` |
+| RabbitMQ (3 nodos) y su API admin | `docker compose up -d --build rabbitmq1 rabbitmq2 rabbitmq3 rabbit-admin` |
+| ZooKeeper, 2 brokers, tópicos y API admin | `docker compose up -d --build kafka-admin` |
+| Kafka UI | `docker compose up -d kafka-ui` |
 
-Para comprobar los nodos de RabbitMQ, ejecuta `docker compose exec rabbitmq1 rabbitmqctl cluster_status`. Kafka UI permite inspeccionar los brokers, consultar grupos de consumidores y gestionar tópicos y configuraciones desde el clúster `pedidos360-cluster`.
+Clientes en el host: `localhost:9092,localhost:9093`. Entre contenedores: `kafka:29092,kafka2:29092`. Para usar Kafka con `orders`, `catalog` o `notifications` fuera de Docker, define `KAFKA_ENABLED=true`.
 
-Los clientes locales de Kafka se conectan a `localhost:9092,localhost:9093`. Desde los contenedores se usa `kafka:29092,kafka2:29092`. Para habilitar el flujo de Kafka al ejecutar `orders` o `notifications` fuera de Docker, configura `KAFKA_ENABLED=true` y, si corresponde, `KAFKA_BOOTSTRAP_SERVERS`.
-
-### Eventos de pedidos y boletas
-
-| Tópico | Productor | Consumidor |
-| --- | --- | --- |
-| `pedidos360.orders.created` | `orders`, después de confirmar el pedido en la base de datos | `notifications`, grupo `pedidos360-notifications` |
-| `pedidos360.notifications.receipt-sent` | `notifications`, después de enviar la boleta por SMTP | `orders`, grupo `pedidos360-orders` |
-
-Los eventos usan el ID del pedido como clave y una marca de tiempo ISO 8601 como valor. Los consumidores registran los eventos para trazabilidad y RabbitMQ entrega los mensajes que disparan el envío de boletas. Las publicaciones de trazabilidad se reintentan dentro del plazo del productor Kafka. Si se agota ese plazo, el microservicio registra el fallo.
-
-El servicio `kafka-init` crea los dos tópicos de la aplicación con tres particiones y dos réplicas. Para comprobar el flujo con la plataforma completa, crea un pedido desde el frontend y revisa ambos tópicos en Kafka UI, los logs de `orders` y `notifications`, y la boleta en MailHog.
-
-### API de administración de Kafka
-
-El servicio `ms-pedidos360-kafka-admin` (antes `demo`) expone estas rutas en `http://localhost:8084`.
+### API de administración de Kafka (`http://localhost:8084`)
 
 | Método y ruta | Operación |
 | --- | --- |
 | `GET /api/topics` | Lista tópicos |
-| `POST /api/topics` | Crea un tópico con `name` y los campos opcionales `partitions`, `replicationFactor` y `configs` |
-| `GET /api/topics/{topic}` | Consulta particiones, líderes y réplicas |
-| `PATCH /api/topics/{topic}` | Aumenta el total de particiones, por ejemplo con `{"partitions":4}` |
+| `POST /api/topics` | Crea un tópico (`name`, `partitions`, `replicationFactor`, `configs`) |
+| `GET /api/topics/{topic}` | Particiones, líderes, réplicas e ISR |
+| `PATCH /api/topics/{topic}` | Aumenta particiones (`{"partitions":4}`) |
 | `DELETE /api/topics/{topic}` | Elimina un tópico |
-| `GET /api/topics/{topic}/configs` | Consulta configuraciones efectivas del tópico |
-| `PATCH /api/topics/{topic}/configs` | Agrega, actualiza o elimina configuraciones del tópico |
-| `GET /api/brokers` | Lista brokers activos |
-| `GET /api/brokers/{id}/configs` | Consulta configuraciones efectivas del broker |
-| `PATCH /api/brokers/{id}/configs` | Agrega, actualiza o elimina configuraciones dinámicas del broker |
+| `GET`, `PATCH /api/topics/{topic}/configs` | Consulta o modifica configuraciones (`{"retention.ms":"86400000"}`; `null` vuelve al valor heredado) |
+| `GET /api/brokers` | Lista brokers |
+| `GET`, `PATCH /api/brokers/{id}/configs` | Consulta o modifica configuraciones dinámicas del broker |
+| `GET /api/consumer-groups` | Lista consumer groups y su estado |
+| `GET /api/consumer-groups/{id}` | Miembros, asignación de particiones, offsets y lag |
+| `POST /api/consumer-groups/{id}/reset-offsets` | Reinicia offsets (`{"topic":"...","to":"earliest"}` o `"latest"`; el grupo debe estar detenido) |
+| `DELETE /api/consumer-groups/{id}` | Elimina un grupo sin consumidores |
 
-En un `PATCH` de configuraciones, envía un objeto JSON con valores de texto para aplicar cambios, por ejemplo `{"retention.ms":"86400000"}`. Envía un valor `null` para quitar el valor personalizado y volver al valor heredado. Kafka admite aumentar el número de particiones y cambiar las configuraciones que el broker permite modificar en caliente.
+### API de administración de RabbitMQ (`http://localhost:8086`)
+
+| Método y ruta | Operación |
+| --- | --- |
+| `GET`, `POST /api/queues` | Lista o crea colas (`name`, `type` classic o quorum, `deadLetterExchange`, `deadLetterRoutingKey`) |
+| `DELETE /api/queues/{name}` | Elimina una cola (`DELETE /api/queues/{name}/messages` la purga) |
+| `GET`, `POST /api/exchanges` | Lista o crea exchanges (`name`, `type` direct, topic, fanout o headers) |
+| `DELETE /api/exchanges/{name}` | Elimina un exchange |
+| `GET`, `POST /api/bindings` | Lista o crea bindings (`exchange`, `queue`, `routingKey`) |
+| `DELETE /api/bindings?exchange=...&queue=...&routingKey=...` | Elimina un binding |
+
+## Boleta electrónica (SII)
+
+`SiiClient` (en `ms-pedidos360-notifications`, paquete `sii`) es el puerto hacia el Servicio de Impuestos Internos. La implementación incluida, `SimulatedSiiClient` (`SII_MODE=simulado`), aplica las reglas de la boleta afecta (DTE 39): precios con IVA incluido, neto = total / 1,19, IVA = total − neto y receptor consumidor final `66666666-6`. Genera folio, timbre y track ID deterministas, así que reintentar entrega la misma boleta.
+
+La API REST real del SII (`apicert.sii.cl` en certificación y `api.sii.cl` en producción, con el flujo semilla → token → envío → consulta por track ID) exige el **certificado digital** del contribuyente, **folios CAF** autorizados y la **certificación** de la empresa ante el SII. Para conectarla basta con agregar otra implementación de `SiiClient` y activarla con `SII_MODE`.
 
 ## Tecnologías Utilizadas
 
@@ -175,6 +211,10 @@ En un `PATCH` de configuraciones, envía un objeto JSON con valores de texto par
 * Spring WebFlux (BFF), Spring Web MVC (Microservicios)
 * Spring Security (OAuth2 Resource Server)
 * Spring Data JPA, Hibernate, MySQL Driver
+
+### Mensajería
+* RabbitMQ 3.13 (clúster de 3 nodos, colas quorum, DLQ), Spring AMQP
+* Apache Kafka (Confluent 7.9, ZooKeeper + 2 brokers), Spring for Apache Kafka, Kafka UI
 
 ### Infraestructura
 * Docker, Docker Compose
