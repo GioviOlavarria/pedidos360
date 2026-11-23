@@ -1,6 +1,8 @@
 package com.pedidos360.orders.domain.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
@@ -23,7 +25,8 @@ public class Order {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR) // VARCHAR y no ENUM nativo: agregar estados no requiere migrar la columna
+    @Column(nullable = false, length = 20)
     private OrderStatus status;
 
     @NotNull
@@ -41,6 +44,13 @@ public class Order {
 
     @Column(name = "customer_name")
     private String customerName;
+
+    /** Pago confirmado por ms-pedidos360-payments (Kafka) o registrado a mano por el Admin. */
+    @Column(name = "paid_at")
+    private Instant paidAt;
+
+    @Column(name = "payment_reference", length = 100)
+    private String paymentReference;
 
     /** Boleta electrónica (SII) informada por notifications a través de Kafka. */
     @Column(name = "receipt_folio")
@@ -122,6 +132,22 @@ public class Order {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
+    }
+
+    public Instant getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(Instant paidAt) {
+        this.paidAt = paidAt;
+    }
+
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    public void setPaymentReference(String paymentReference) {
+        this.paymentReference = paymentReference;
     }
 
     public Long getReceiptFolio() {

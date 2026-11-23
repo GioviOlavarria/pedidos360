@@ -25,6 +25,8 @@ app:
       url: ${ORDERS_SERVICE_URL:http://localhost:8081}
     catalog:
       url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    payments:
+      url: ${PAYMENTS_SERVICE_URL:http://localhost:8087}
 
 ---
 # Perfil docker: contenedor dentro de docker compose
@@ -39,3 +41,5 @@ app:
       url: ${ORDERS_SERVICE_URL:http://orders:8081}
     catalog:
       url: ${CATALOG_SERVICE_URL:http://catalog:8082}
+    payments:
+      url: ${PAYMENTS_SERVICE_URL:http://payments:8087}

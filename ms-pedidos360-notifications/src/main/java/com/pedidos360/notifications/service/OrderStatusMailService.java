@@ -20,6 +20,7 @@ public class OrderStatusMailService {
     private static final Logger log = LoggerFactory.getLogger(OrderStatusMailService.class);
 
     private static final Map<String, String> LABELS = Map.of(
+            "PENDIENTE_PAGO", "Pendiente de pago",
             "CREADO", "Creado",
             "ACEPTADO", "Aceptado",
             "EN_PREPARACION", "En preparación",

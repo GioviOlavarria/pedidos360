@@ -82,8 +82,11 @@ app:
     admin-emails: ${ADMIN_EMAILS:gi.olavarria@duocuc.cl}
     # Opcional: exigir además que el Admin pertenezca a este tenant (recomendado).
     admin-tenant-id: ${ADMIN_TENANT_ID:}
+  payments:
+    # Plazo para pagar un pedido antes de cancelarlo y devolver el stock.
+    expiration: ${PAYMENT_EXPIRATION:PT30M}
   internal:
-    # Clave compartida para llamadas servicio a servicio (orders -> catalog).
+    # Clave compartida para llamadas servicio a servicio (orders -> catalog, payments -> orders).
     api-key: ${INTERNAL_API_KEY:}
   services:
     catalog:

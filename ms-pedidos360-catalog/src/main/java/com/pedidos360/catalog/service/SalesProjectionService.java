@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Mantiene la estadística de ventas por producto a partir de los eventos de pedidos.
@@ -23,6 +24,8 @@ public class SalesProjectionService {
 
     private static final Logger log = LoggerFactory.getLogger(SalesProjectionService.class);
 
+    private static final Set<String> NOT_SOLD = Set.of("PENDIENTE_PAGO", "CANCELADO");
+
     private final OrderSalesLineRepository repository;
 
     public SalesProjectionService(OrderSalesLineRepository repository) {
@@ -32,7 +35,8 @@ public class SalesProjectionService {
     @Transactional
     public void apply(OrderEventMessage event) {
         int removed = repository.deleteByOrderId(event.orderId());
-        if (event.type() == OrderEventType.DELETED || "CANCELADO".equals(event.status())) {
+        // Solo cuentan como venta los pedidos pagados y vigentes.
+        if (event.type() == OrderEventType.DELETED || NOT_SOLD.contains(event.status())) {
             log.info("Ventas: pedido #{} {} -> se quitan {} líneas", event.orderId(), event.type(), removed);
             return;
         }

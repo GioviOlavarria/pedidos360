@@ -11,7 +11,7 @@ import com.pedidos360.orders.domain.model.OrderStatus;
 import com.pedidos360.orders.domain.model.exception.InvalidOrderStateException;
 import com.pedidos360.orders.domain.model.exception.OrderNotFoundException;
 import com.pedidos360.orders.messaging.OrderChangedEvent;
-import com.pedidos360.orders.messaging.OrderCreatedEvent;
+import com.pedidos360.orders.messaging.OrderPaidEvent;
 import com.pedidos360.orders.messaging.kafka.OrderEventType;
 import com.pedidos360.orders.repository.OrderRepository;
 import org.slf4j.Logger;
@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -35,7 +37,7 @@ public class OrderService {
 
     /** Estados en que la mercadería aún está en bodega: eliminar el pedido devuelve el stock. */
     private static final Set<OrderStatus> STOCK_IN_WAREHOUSE =
-            EnumSet.of(OrderStatus.CREADO, OrderStatus.ACEPTADO, OrderStatus.EN_PREPARACION);
+            EnumSet.of(OrderStatus.PENDIENTE_PAGO, OrderStatus.CREADO, OrderStatus.ACEPTADO, OrderStatus.EN_PREPARACION);
 
     /** Estados en que el Admin todavía puede modificar los productos del pedido. */
     private static final Set<OrderStatus> EDITABLE = EnumSet.of(OrderStatus.CREADO, OrderStatus.ACEPTADO);
@@ -52,8 +54,8 @@ public class OrderService {
     }
 
     /**
-     * Crea un pedido: reserva stock en el catálogo (que entrega los precios vigentes), calcula el
-     * total en el servidor, guarda el pedido y deja programado el evento para la boleta por correo.
+     * Crea un pedido PENDIENTE_PAGO: reserva stock en el catálogo (que entrega los precios vigentes) y calcula el
+     * total en el servidor. La boleta se emite recién cuando se confirma el pago (ver {@link #markPaid}).
      */
     public Order createOrder(OrderRequest request, CurrentUser user) {
         List<StockItem> stockItems = toStockItems(request.getItems());
@@ -63,7 +65,7 @@ public class OrderService {
         order.setCustomerId(request.getCustomerId());
         order.setCustomerEmail(user.email());
         order.setCustomerName(user.name());
-        order.setStatus(OrderStatus.CREADO);
+        order.setStatus(OrderStatus.PENDIENTE_PAGO);
         order.setCreatedAt(LocalDateTime.now());
         applyItems(order, reserved);
 
@@ -75,7 +77,7 @@ public class OrderService {
             throw e;
         }
 
-        eventPublisher.publishEvent(toEvent(saved));
+        eventPublisher.publishEvent(OrderChangedEvent.of(OrderEventType.CREATED, saved, null));
         return saved;
     }
 
@@ -143,6 +145,10 @@ public class OrderService {
     public Order changeStatus(Long orderId, OrderStatus nuevoEstado) {
         Order order = findById(orderId);
         validateStateTransition(order.getStatus(), nuevoEstado);
+        if (order.getStatus() == OrderStatus.PENDIENTE_PAGO && nuevoEstado == OrderStatus.CREADO) {
+            // El Admin registra un pago recibido fuera de la pasarela (p. ej. transferencia).
+            return markPaid(orderId, "MANUAL-ADMIN", Instant.now());
+        }
 
         if (nuevoEstado == OrderStatus.CANCELADO) {
             catalogClient.release(itemsOf(order));
@@ -153,6 +159,74 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         eventPublisher.publishEvent(OrderChangedEvent.of(OrderEventType.STATUS_CHANGED, order, anterior));
         return saved;
+    }
+
+    /**
+     * Pago confirmado: PENDIENTE_PAGO → CREADO y se programa la boleta (RabbitMQ) para después del commit.
+     * Es idempotente: si el pedido ya registró ese mismo pago no hace nada. Un pago que llega para un pedido que
+     * ya no está pendiente (p. ej. vencido) se deja en el log para devolución manual.
+     */
+    public Order markPaid(Long orderId, String paymentReference, Instant paidAt) {
+        Order order = findById(orderId);
+        if (order.getStatus() != OrderStatus.PENDIENTE_PAGO) {
+            if (!paymentReference.equals(order.getPaymentReference())) {
+                log.error("Pago {} recibido para el pedido #{} en estado {}: requiere devolución manual",
+                        paymentReference, orderId, order.getStatus());
+            }
+            return order;
+        }
+        order.setStatus(OrderStatus.CREADO);
+        order.setPaidAt(paidAt);
+        order.setPaymentReference(paymentReference);
+        Order saved = orderRepository.save(order);
+        eventPublisher.publishEvent(OrderChangedEvent.of(OrderEventType.STATUS_CHANGED, order, OrderStatus.PENDIENTE_PAGO));
+        eventPublisher.publishEvent(toEvent(order));
+        log.info("Pedido #{} pagado ({}): se emitirá la boleta", orderId, paymentReference);
+        return saved;
+    }
+
+    /** Pago rechazado, anulado o vencido: el pedido pendiente se cancela y se devuelve el stock. */
+    public void cancelUnpaid(Long orderId, String reason) {
+        Order order = findById(orderId);
+        if (order.getStatus() != OrderStatus.PENDIENTE_PAGO) {
+            return;
+        }
+        releaseQuietly(itemsOf(order));
+        order.setStatus(OrderStatus.CANCELADO);
+        orderRepository.save(order);
+        eventPublisher.publishEvent(OrderChangedEvent.of(OrderEventType.STATUS_CHANGED, order, OrderStatus.PENDIENTE_PAGO));
+        log.info("Pedido #{} cancelado: {}", orderId, reason);
+    }
+
+    /**
+     * Aplica el resultado de un pago (evento Kafka de ms-pedidos360-payments). El monto pagado debe cubrir el
+     * total del pedido; si no, el evento es inválido (IllegalArgumentException → DLT sin reintentos).
+     */
+    public void applyPaymentResult(Long orderId, String status, BigDecimal amount, String paymentReference, Instant at) {
+        if (orderRepository.findById(orderId).isEmpty()) {
+            log.warn("Resultado de pago {} para pedido #{} inexistente: se descarta", paymentReference, orderId);
+            return;
+        }
+        switch (status) {
+            case "PAID" -> {
+                BigDecimal total = findById(orderId).getTotal();
+                if (amount == null || amount.compareTo(total.setScale(0, RoundingMode.HALF_UP)) < 0) {
+                    throw new IllegalArgumentException("Pago " + paymentReference + " por " + amount
+                            + " no cubre el total del pedido #" + orderId + " (" + total + ")");
+                }
+                markPaid(orderId, paymentReference, at);
+            }
+            case "REJECTED", "CANCELLED", "EXPIRED" -> cancelUnpaid(orderId, "pago " + paymentReference + " " + status);
+            default -> throw new IllegalArgumentException("Estado de pago desconocido: " + status);
+        }
+    }
+
+    /** Cancela los pedidos que siguen sin pagar después del plazo (libera el stock reservado). */
+    public int expireUnpaid(Duration maxAge) {
+        LocalDateTime cutoff = LocalDateTime.now().minus(maxAge);
+        List<Order> expired = orderRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDIENTE_PAGO, cutoff);
+        expired.forEach(order -> cancelUnpaid(order.getId(), "pago no completado en " + maxAge.toMinutes() + " minutos"));
+        return expired.size();
     }
 
     /**
@@ -207,12 +281,12 @@ public class OrderService {
         }
     }
 
-    private static OrderCreatedEvent toEvent(Order order) {
-        List<OrderCreatedEvent.Item> items = order.getItems().stream()
-                .map(i -> new OrderCreatedEvent.Item(i.getProductId(), i.getProductName(), i.getQuantity(),
+    private static OrderPaidEvent toEvent(Order order) {
+        List<OrderPaidEvent.Item> items = order.getItems().stream()
+                .map(i -> new OrderPaidEvent.Item(i.getProductId(), i.getProductName(), i.getQuantity(),
                         i.getUnitPrice(), i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity()))))
                 .toList();
-        return new OrderCreatedEvent(order.getId(), order.getCustomerEmail(), order.getCustomerName(),
+        return new OrderPaidEvent(order.getId(), order.getCustomerEmail(), order.getCustomerName(),
                 order.getCreatedAt(), order.getTotal(), items);
     }
 
@@ -228,6 +302,13 @@ public class OrderService {
         }
 
         switch (estadoActual) {
+            case PENDIENTE_PAGO:
+                if (nuevoEstado != OrderStatus.CREADO && nuevoEstado != OrderStatus.CANCELADO) {
+                    throw new InvalidOrderStateException(
+                            "Un pedido sin pagar solo puede confirmarse como pagado (CREADO) o CANCELARSE, no pasar a " + nuevoEstado);
+                }
+                break;
+
             case CREADO:
                 if (nuevoEstado != OrderStatus.ACEPTADO && nuevoEstado != OrderStatus.CANCELADO) {
                     throw new InvalidOrderStateException(

@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [ ms-pedidos360-bff, ms-pedidos360-catalog, ms-pedidos360-orders, ms-pedidos360-notifications, ms-pedidos360-kafka-admin, ms-pedidos360-rabbit-admin ]
+        service: [ ms-pedidos360-bff, ms-pedidos360-catalog, ms-pedidos360-orders, ms-pedidos360-notifications, ms-pedidos360-kafka-admin, ms-pedidos360-rabbit-admin, ms-pedidos360-payments ]
 
     steps:
     - name: Checkout code
@@ -64,7 +64,7 @@ jobs:
       fail-fast: false
       matrix:
         # Una imagen por job: si falla, el nombre del job indica cuál y el error queda como annotation.
-        service: [ bff, catalog, orders, notifications, frontend, kafka-admin, rabbit-admin ]
+        service: [ bff, catalog, orders, notifications, payments, frontend, kafka-admin, rabbit-admin ]
 
     steps:
     - name: Checkout code

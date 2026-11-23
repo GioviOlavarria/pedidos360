@@ -11,6 +11,8 @@ import { AppLayout } from './layout/app-layout';
  *   /dashboard           → Admin, Operator (el resto va a /catalog)
  *   /orders              → cualquier usuario autenticado
  *   /reports             → Admin
+ *   /carrito             → carrito (público; pagar exige sesión)
+ *   /checkout/*          → pasarela simulada y resultado del pago (autenticado)
  */
 export const routes: Routes = [
   {
@@ -52,6 +54,24 @@ export const routes: Routes = [
         path: 'catalog',
         title: 'Catálogo · Pedidos360',
         loadComponent: () => import('./pages/catalog/catalog-page').then((m) => m.CatalogPage),
+      },
+      {
+        path: 'carrito',
+        title: 'Carrito · Pedidos360',
+        loadComponent: () => import('./pages/cart/cart-page').then((m) => m.CartPage),
+      },
+      {
+        path: 'checkout/simulado',
+        title: 'Pago · Pedidos360',
+        canActivate: [roleGuard([])],
+        loadComponent: () =>
+          import('./pages/checkout-simulated/checkout-simulated-page').then((m) => m.CheckoutSimulatedPage),
+      },
+      {
+        path: 'checkout/resultado',
+        title: 'Resultado del pago · Pedidos360',
+        canActivate: [roleGuard([])],
+        loadComponent: () => import('./pages/checkout-result/checkout-result-page').then((m) => m.CheckoutResultPage),
       },
       {
         path: 'dashboard',

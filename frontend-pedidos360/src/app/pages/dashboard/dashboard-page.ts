@@ -33,12 +33,21 @@ export class DashboardPage implements OnInit {
       const d = new Date(o.createdAt);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
+    // Pagados que el Admin aún debe aceptar o preparar.
     const pending = orders.filter((o) => o.status === 'CREADO' || o.status === 'ACEPTADO').length;
     return [
       { icon: '📦', value: String(thisMonth.length), label: 'Pedidos este mes' },
       { icon: '✅', value: `${percent(countByStatus(orders, 'ENTREGADO'), orders.length)}%`, label: 'Tasa de entrega' },
       { icon: '🕒', value: String(pending), label: 'Pedidos por gestionar' },
-      { icon: '💰', value: formatMoney(thisMonth.reduce((sum, o) => sum + (Number(o.total) || 0), 0)), label: 'Ingresos del mes' },
+      {
+        icon: '💰',
+        value: formatMoney(
+          thisMonth
+            .filter((o) => o.status !== 'PENDIENTE_PAGO' && o.status !== 'CANCELADO')
+            .reduce((sum, o) => sum + (Number(o.total) || 0), 0),
+        ),
+        label: 'Ingresos del mes (pagados)',
+      },
     ];
   });
 

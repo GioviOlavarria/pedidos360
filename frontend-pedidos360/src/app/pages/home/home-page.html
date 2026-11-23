@@ -46,7 +46,7 @@
             <h2>Productos para Seleccionar</h2>
             <span class="p-tag client-orange">Catálogo Disponible</span>
           </div>
-          <p class="p-subtitle">Selecciona la cantidad de insumos que necesitas y agrégalos a tu orden de compra.</p>
+          <p class="p-subtitle">Selecciona la cantidad que necesitas, agrégala al carrito y paga con Flow.</p>
         </div>
         <div class="search">
           <input type="text" class="p-input" placeholder="Buscar por nombre o descripción..." [value]="search()"
@@ -91,8 +91,8 @@
                         <button type="button" (click)="changeQty(p, 1)" [disabled]="qty(p) >= p.stock">+</button>
                       </div>
                     </div>
-                    <button type="button" class="p-btn p-btn-primary p-btn-block" (click)="select(p)">
-                      <span>🛒</span> Seleccionar ({{ qty(p) }}) · {{ p.price * qty(p) | money }}
+                    <button type="button" class="p-btn p-btn-primary p-btn-block" (click)="addToCart(p)">
+                      <span>🛒</span> Agregar al carrito ({{ qty(p) }}) · {{ p.price * qty(p) | money }}
                     </button>
                   </div>
                 } @else {
@@ -159,7 +159,15 @@
             </div>
 
             <h4 class="steps-title">Trazabilidad del Envío:</h4>
-            @if (order.status === 'CANCELADO') {
+            @if (order.status === 'PENDIENTE_PAGO') {
+              <div class="cancelled waiting">
+                <span>💳</span>
+                <div>
+                  <strong>Pedido pendiente de pago.</strong>
+                  <div>El despacho comenzará cuando se confirme el pago en Flow.</div>
+                </div>
+              </div>
+            } @else if (order.status === 'CANCELADO') {
               <div class="cancelled">
                 <span>❌</span>
                 <div>
@@ -197,50 +205,9 @@
   }
 </div>
 
-<!-- Confirmación de compra -->
-@if (selected(); as selection) {
-  <div class="p-modal-overlay">
-    <div class="p-modal confirm" role="dialog" aria-modal="true">
-      <div class="confirm-head">
-        <div class="confirm-icon">🛒</div>
-        <h3>Confirmar Selección</h3>
-        <p>{{ selection.product.name }}</p>
-      </div>
-      <div class="p-summary">
-        <div class="p-summary-row"><span>Cantidad seleccionada:</span><strong>{{ selection.quantity }} un.</strong></div>
-        <div class="p-summary-row"><span>Precio unitario:</span><span>{{ selection.product.price | money }}</span></div>
-        <div class="p-summary-total"><span>Total a pagar:</span><strong>{{ selection.product.price * selection.quantity | money }}</strong></div>
-      </div>
-      @if (!auth.isAuthenticated()) {
-        <div class="guest-info">
-          ℹ️ <strong>Modo Invitado:</strong> Para registrar el despacho a tu dirección y emitir la orden en el sistema
-          corporativo, inicia sesión con tu cuenta de Microsoft.
-        </div>
-      }
-      <div class="confirm-actions">
-        <button type="button" class="p-btn p-btn-secondary" (click)="selected.set(null)">Cancelar</button>
-        <button type="button" class="p-btn p-btn-primary wide" (click)="confirmPurchase()" [disabled]="purchasing()">
-          {{ purchasing() ? 'Procesando...' : auth.isAuthenticated() ? 'Confirmar Compra' : 'Iniciar sesión y Comprar' }}
-        </button>
-      </div>
-    </div>
-  </div>
-}
-
-<!-- Compra exitosa -->
-@if (purchased(); as order) {
-  <div class="p-modal-overlay">
-    <div class="p-modal confirm center" role="dialog" aria-modal="true">
-      <div class="ok-icon">✓</div>
-      <h3>¡Pedido Creado con Éxito!</h3>
-      <p class="ok-text">
-        Tu orden ha sido registrada bajo el ID <strong>#{{ order.id }}</strong> por un total de
-        <strong>{{ order.total | money }}</strong>. La boleta electrónica llegará a tu correo.
-      </p>
-      <div class="confirm-actions">
-        <button type="button" class="p-btn p-btn-navy grow" (click)="trackPurchased()">🔍 Rastrear este pedido</button>
-        <button type="button" class="p-btn p-btn-secondary grow" (click)="purchased.set(null)">Cerrar</button>
-      </div>
-    </div>
+@if (added()) {
+  <div class="p-toast">
+    ✅ {{ added() }}
+    <a routerLink="/carrito">Ver carrito ({{ cart.count() }}) →</a>
   </div>
 }

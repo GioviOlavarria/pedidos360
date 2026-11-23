@@ -4,6 +4,7 @@
 #
 #   pedidos360.orders.events      3 particiones, RF 2, delete, retención 7 días   (orders -> catalog, notifications)
 #   pedidos360.billing.receipts   3 particiones, RF 2, compact (última boleta por pedido) (notifications -> orders)
+#   pedidos360.payments.events    3 particiones, RF 2, delete, retención 30 días  (payments -> orders)
 #   *.DLT                         1 partición,   RF 2, delete, retención 30 días  (mensajes que fallaron)
 set -euo pipefail
 
@@ -30,10 +31,16 @@ ensure_topic pedidos360.orders.events 3 2 \
 ensure_topic pedidos360.billing.receipts 3 2 \
   "cleanup.policy=compact,min.compaction.lag.ms=60000,delete.retention.ms=${DAY_MS},segment.ms=3600000,min.insync.replicas=1"
 
+ensure_topic pedidos360.payments.events 3 2 \
+  "cleanup.policy=delete,retention.ms=$((30 * DAY_MS)),min.insync.replicas=1"
+
 ensure_topic pedidos360.orders.events.DLT 1 2 \
   "cleanup.policy=delete,retention.ms=$((30 * DAY_MS))"
 
 ensure_topic pedidos360.billing.receipts.DLT 1 2 \
+  "cleanup.policy=delete,retention.ms=$((30 * DAY_MS))"
+
+ensure_topic pedidos360.payments.events.DLT 1 2 \
   "cleanup.policy=delete,retention.ms=$((30 * DAY_MS))"
 
 echo "Tópicos de Pedidos360:"

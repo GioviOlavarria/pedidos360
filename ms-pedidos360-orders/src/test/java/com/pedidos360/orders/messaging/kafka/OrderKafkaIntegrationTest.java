@@ -52,7 +52,7 @@ import static org.mockito.Mockito.when;
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}"
 })
 @EmbeddedKafka(kraft = false, count = 2, partitions = KafkaTopics.PARTITIONS,
-        topics = {KafkaTopics.BILLING_RECEIPTS})
+        topics = {KafkaTopics.BILLING_RECEIPTS, KafkaTopics.PAYMENT_EVENTS})
 @ActiveProfiles("test")
 class OrderKafkaIntegrationTest {
 
@@ -92,16 +92,17 @@ class OrderKafkaIntegrationTest {
     @Test
     void publishesOrderLifecycleEventsKeyedByOrderId() {
         Order order = orderService.createOrder(request(), CUSTOMER);
-        orderService.changeStatus(order.getId(), OrderStatus.ACEPTADO);
+        orderService.markPaid(order.getId(), "SIMULADO-1", java.time.Instant.now());
 
-        List<ConsumerRecord<String, String>> records = readAll(KafkaTopics.ORDER_EVENTS, 2);
+        // Otros tests de la clase también publican en el tópico: se filtra por la clave de este pedido.
+        String key = order.getId().toString();
+        List<ConsumerRecord<String, String>> records = readAll(KafkaTopics.ORDER_EVENTS, 2, key);
         assertEquals(2, records.size());
-        assertTrue(records.stream().allMatch(r -> r.key().equals(order.getId().toString())));
         // Misma clave => misma partición => orden garantizado.
         assertEquals(records.get(0).partition(), records.get(1).partition());
         assertTrue(records.get(0).value().contains("\"type\":\"CREATED\""));
         assertTrue(records.get(1).value().contains("\"type\":\"STATUS_CHANGED\""));
-        assertTrue(records.get(1).value().contains("\"previousStatus\":\"CREADO\""));
+        assertTrue(records.get(1).value().contains("\"previousStatus\":\"PENDIENTE_PAGO\""));
     }
 
     @Test
@@ -122,6 +123,37 @@ class OrderKafkaIntegrationTest {
     }
 
     @Test
+    void paymentEventsMarkOrdersPaidOrCancelled() throws Exception {
+        Order paid = orderService.createOrder(request(), CUSTOMER);
+        Order rejected = orderService.createOrder(request(), CUSTOMER);
+        rawProducer.send(KafkaTopics.PAYMENT_EVENTS, paid.getId().toString(), payment(paid.getId(), "PAID", 5980)).get();
+        rawProducer.send(KafkaTopics.PAYMENT_EVENTS, rejected.getId().toString(), payment(rejected.getId(), "REJECTED", 5980)).get();
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+            assertEquals(OrderStatus.CREADO, repository.findById(paid.getId()).orElseThrow().getStatus());
+            assertEquals(OrderStatus.CANCELADO, repository.findById(rejected.getId()).orElseThrow().getStatus());
+        });
+        assertEquals("FLOW-777", repository.findById(paid.getId()).orElseThrow().getPaymentReference());
+    }
+
+    @Test
+    void underpaidPaymentGoesToDeadLetterTopic() throws Exception {
+        Order order = orderService.createOrder(request(), CUSTOMER);
+        rawProducer.send(KafkaTopics.PAYMENT_EVENTS, order.getId().toString(), payment(order.getId(), "PAID", 10)).get();
+
+        List<ConsumerRecord<String, String>> dead = readAll(KafkaTopics.PAYMENT_EVENTS + KafkaTopics.DLT_SUFFIX, 1);
+        assertEquals(order.getId().toString(), dead.getFirst().key());
+        assertEquals(OrderStatus.PENDIENTE_PAGO, repository.findById(order.getId()).orElseThrow().getStatus());
+    }
+
+    private static String payment(Long orderId, String status, int amount) {
+        return """
+                {"paymentId":1,"orderId":%d,"status":"%s","amount":%d,"provider":"FLOW","providerReference":"777",
+                 "paymentMethod":"Webpay","occurredAt":"2026-11-23T12:00:00Z"}
+                """.formatted(orderId, status, amount);
+    }
+
+    @Test
     void malformedAndInvalidReceiptsGoToDeadLetterTopic() throws Exception {
         rawProducer.send(KafkaTopics.BILLING_RECEIPTS, "900", "esto-no-es-json").get();
         rawProducer.send(KafkaTopics.BILLING_RECEIPTS, "901", "{\"orderId\":901,\"documentType\":39}").get();
@@ -132,6 +164,10 @@ class OrderKafkaIntegrationTest {
     }
 
     private List<ConsumerRecord<String, String>> readAll(String topic, int expected) {
+        return readAll(topic, expected, null);
+    }
+
+    private List<ConsumerRecord<String, String>> readAll(String topic, int expected, String key) {
         Map<String, Object> props = KafkaTestUtils.consumerProps("test-" + topic + System.nanoTime(), "false", broker);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         try (Consumer<String, String> consumer = new DefaultKafkaConsumerFactory<>(props,
@@ -141,7 +177,9 @@ class OrderKafkaIntegrationTest {
             long deadline = System.currentTimeMillis() + 30_000;
             while (result.size() < expected && System.currentTimeMillis() < deadline) {
                 ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(500));
-                polled.forEach(result::add);
+                polled.forEach(r -> {
+                    if (key == null || key.equals(r.key())) result.add(r);
+                });
             }
             result.sort((a, b) -> Long.compare(a.timestamp(), b.timestamp()));
             return result;

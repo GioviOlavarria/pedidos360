@@ -17,6 +17,15 @@
       <h4>Seguimiento de Entrega</h4>
       @if (cancelled()) {
         <div class="cancelled-text"><span>❌</span> Pedido cancelado</div>
+      } @else if (o.status === 'PENDIENTE_PAGO') {
+        <div class="pending-text">
+          <span>💳 Esperando el pago en Flow.</span>
+          @if (!isAdmin()) {
+            <button type="button" class="p-btn p-btn-primary" (click)="payNow()" [disabled]="paying()">
+              {{ paying() ? 'Redirigiendo...' : 'Pagar ahora · ' + (o.total | money) }}
+            </button>
+          }
+        </div>
       } @else {
         <div class="timeline">
           @for (step of steps; track step; let i = $index) {
@@ -31,7 +40,10 @@
 
     <div class="rows">
       <div class="row"><span>Cliente:</span><strong>{{ o.customerName || '#' + o.customerId }}</strong></div>
-      <div class="row"><span>Estado Actual:</span><strong [class.danger]="cancelled()">{{ o.status }}</strong></div>
+      <div class="row"><span>Estado Actual:</span><strong [class.danger]="cancelled()">{{ label(o.status) }}</strong></div>
+      @if (o.paymentReference) {
+        <div class="row"><span>Pago:</span><strong>{{ o.paymentReference }}{{ o.paidAt ? ' · ' + (o.paidAt | date: 'dd-MM-yyyy HH:mm') : '' }}</strong></div>
+      }
     </div>
 
     <!-- Ítems -->
@@ -74,7 +86,9 @@
         <h3>Acciones de Administración</h3>
         <div class="admin-actions">
           @if (nextStatus(); as next) {
-            <button type="button" class="p-btn p-btn-navy" (click)="changeStatus(next)">⏩ Avanzar a {{ label(next) }}</button>
+            <button type="button" class="p-btn p-btn-navy" (click)="changeStatus(next)">
+              {{ o.status === 'PENDIENTE_PAGO' ? '💵 Registrar pago manual' : '⏩ Avanzar a ' + label(next) }}
+            </button>
           }
           @if (o.status === 'CREADO' || o.status === 'ACEPTADO') {
             <button type="button" class="p-btn p-btn-light" (click)="edit.emit(o)">✏️ Editar Pedido</button>

@@ -1,0 +1,47 @@
+<div class="p-page wrap">
+  <div class="result" [class]="state()">
+    @if (error()) {
+      <div class="icon">⚠️</div>
+      <h1>No pudimos obtener el resultado</h1>
+      <p>{{ error() }}</p>
+    } @else if (state() === 'pending') {
+      <div class="icon spin">⏳</div>
+      <h1>Confirmando su pago...</h1>
+      <p>Estamos verificando el pago del pedido #{{ orderId() }} con la pasarela.</p>
+      @if (!polling()) {
+        <p>El pago aún no se confirma. Si ya pagó, verifique nuevamente; si no, puede intentarlo otra vez.</p>
+        <div class="actions">
+          <button type="button" class="p-btn p-btn-light" (click)="checkAgain()">🔄 Verificar nuevamente</button>
+          <button type="button" class="p-btn p-btn-primary" (click)="retryPayment()" [disabled]="retrying()">Pagar ahora</button>
+        </div>
+      }
+    } @else if (state() === 'paid') {
+      <div class="icon">✅</div>
+      <h1>¡Pago confirmado!</h1>
+      <p>Su pedido <strong>#{{ order()!.id }}</strong> por <strong>{{ order()!.total | money }}</strong> fue pagado.</p>
+      <div class="p-summary">
+        <div class="p-summary-row"><span>Referencia de pago</span><span>{{ order()!.paymentReference }}</span></div>
+        <div class="p-summary-row">
+          <span>Boleta electrónica</span>
+          @if (order()!.receiptFolio) {
+            <strong>N° {{ order()!.receiptFolio }} ({{ order()!.receiptSiiStatus }})</strong>
+          } @else {
+            <span>{{ polling() ? 'Emitiendo...' : 'Llegará a su correo' }}</span>
+          }
+        </div>
+      </div>
+      <div class="actions">
+        <a routerLink="/orders" class="p-btn p-btn-navy">📦 Ver mis pedidos</a>
+        <a routerLink="/catalog" class="p-btn p-btn-light">Seguir comprando</a>
+      </div>
+    } @else {
+      <div class="icon">❌</div>
+      <h1>El pago no se completó</h1>
+      <p>El pedido #{{ order()!.id }} fue cancelado y los productos volvieron al stock. No se realizó ningún cobro.</p>
+      <div class="actions">
+        <a routerLink="/carrito" class="p-btn p-btn-light">Volver al carrito</a>
+        <a routerLink="/catalog" class="p-btn p-btn-primary">Ir al catálogo</a>
+      </div>
+    }
+  </div>
+</div>

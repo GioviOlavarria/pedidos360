@@ -52,6 +52,10 @@ public class OrderEventsListener {
             // La boleta de un pedido nuevo la envía el flujo RabbitMQ; ediciones y eliminaciones no notifican.
             return;
         }
+        if ("PENDIENTE_PAGO".equals(event.previousStatus()) && "CREADO".equals(event.status())) {
+            // Pago confirmado: el cliente recibe la boleta por RabbitMQ, no hace falta otro correo.
+            return;
+        }
         if (event.customerEmail() == null || !event.customerEmail().contains("@")) {
             log.warn("Pedido #{} sin correo: no se notifica el cambio a {}", event.orderId(), event.status());
             return;

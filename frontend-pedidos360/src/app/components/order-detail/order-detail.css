@@ -69,6 +69,15 @@
   gap: 8px;
 }
 
+.pending-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--slate-600);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 .timeline {
   display: flex;
   justify-content: space-between;

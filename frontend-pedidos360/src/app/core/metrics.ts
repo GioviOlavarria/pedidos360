@@ -7,7 +7,8 @@ export type ReportFilter = 'ACTIVE' | 'DELIVERED' | 'ALL';
 
 export function filterOrders(orders: Order[], filter: ReportFilter): Order[] {
   if (filter === 'DELIVERED') return orders.filter((o) => o.status === 'ENTREGADO');
-  if (filter === 'ACTIVE') return orders.filter((o) => o.status !== 'CANCELADO');
+  // Pedidos válidos = pagados y no cancelados.
+  if (filter === 'ACTIVE') return orders.filter((o) => o.status !== 'CANCELADO' && o.status !== 'PENDIENTE_PAGO');
   return orders;
 }
 

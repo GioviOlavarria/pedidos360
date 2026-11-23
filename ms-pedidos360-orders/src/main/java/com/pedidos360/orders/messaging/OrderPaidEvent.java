@@ -5,10 +5,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Mensaje publicado en RabbitMQ cuando se crea un pedido. Lo consume ms-pedidos360-notifications
- * para enviar la boleta por correo. Debe mantenerse compatible con la copia de notifications.
+ * Mensaje publicado en RabbitMQ cuando se confirma el pago de un pedido. Lo consume ms-pedidos360-notifications
+ * para emitir la boleta electrónica (SII) y enviarla por correo. Compatible con OrderCreatedEvent de notifications.
  */
-public record OrderCreatedEvent(
+public record OrderPaidEvent(
         Long orderId,
         String customerEmail,
         String customerName,

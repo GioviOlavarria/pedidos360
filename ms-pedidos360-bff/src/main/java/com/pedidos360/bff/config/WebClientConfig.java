@@ -14,9 +14,17 @@ public class WebClientConfig {
     @Value("${app.services.catalog.url}")
     private String catalogServiceUrl;
 
+    @Value("${app.services.payments.url}")
+    private String paymentsServiceUrl;
+
     @Bean(name = "webClientOrders")
     public WebClient webClientOrders(WebClient.Builder builder) {
         return builder.baseUrl(ordersServiceUrl).build();
+    }
+
+    @Bean(name = "webClientPayments")
+    public WebClient webClientPayments(WebClient.Builder builder) {
+        return builder.baseUrl(paymentsServiceUrl).build();
     }
 
     @Bean(name = "webClientCatalog")

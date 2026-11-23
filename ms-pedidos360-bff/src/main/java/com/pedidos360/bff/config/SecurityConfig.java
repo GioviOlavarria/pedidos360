@@ -43,7 +43,10 @@ public class SecurityConfig {
                         // Catálogo y seguimiento públicos; cada servicio decide qué GET exige sesión.
                         .pathMatchers(HttpMethod.GET, "/api/catalog", "/api/catalog/**").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/orders", "/api/orders/**").permitAll()
-                        .pathMatchers("/api/catalog", "/api/catalog/**", "/api/orders", "/api/orders/**").authenticated()
+                        // Retorno y confirmación de la pasarela de pago (Flow): sin JWT, payments verifica el token en Flow.
+                        .pathMatchers("/api/payments/*/return", "/api/payments/*/confirmation").permitAll()
+                        .pathMatchers("/api/catalog", "/api/catalog/**", "/api/orders", "/api/orders/**",
+                                "/api/payments", "/api/payments/**").authenticated()
                         .anyExchange().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))

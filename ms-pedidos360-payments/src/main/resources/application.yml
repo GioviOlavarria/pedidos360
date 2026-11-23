@@ -1,0 +1,63 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: ms-pedidos360-payments
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3307/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  # ── Productor Kafka (resultado de cada pago → orders) ──
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093}
+    client-id: ms-pedidos360-payments
+    admin:
+      auto-create: true
+      modify-topic-configs: true
+      fail-fast: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 10
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 30000
+        spring.json.add.type.headers: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  payments:
+    # simulado (por defecto, sin cuenta) o flow (API de Flow con FLOW_API_KEY / FLOW_SECRET_KEY)
+    provider: ${PAYMENT_PROVIDER:simulado}
+    # URL por la que el navegador y Flow llegan a este servicio (el BFF enruta /api/payments/**).
+    public-url: ${PAYMENTS_PUBLIC_URL:http://localhost:8080}
+    frontend-url: ${FRONTEND_URL:http://localhost:3000}
+    flow:
+      api-url: ${FLOW_API_URL:https://sandbox.flow.cl/api}
+      api-key: ${FLOW_API_KEY:}
+      secret-key: ${FLOW_SECRET_KEY:}
+      # Menor que el vencimiento del pedido (30 min en orders).
+      timeout: ${FLOW_PAYMENT_TIMEOUT:PT20M}
+  security:
+    api-client-id: ${API_CLIENT_ID:}
+    admin-emails: ${ADMIN_EMAILS:gi.olavarria@duocuc.cl}
+    admin-tenant-id: ${ADMIN_TENANT_ID:}
+  internal:
+    # Clave compartida para llamadas servicio a servicio (payments -> orders).
+    api-key: ${INTERNAL_API_KEY:}
+  services:
+    orders:
+      url: ${ORDERS_SERVICE_URL:http://localhost:8081}

@@ -372,6 +372,28 @@ button {
   transition: width 0.8s ease;
 }
 
+/* ── Aviso flotante (p. ej. "agregado al carrito") ─────────────────────── */
+.p-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  background: var(--navy);
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 0.88rem;
+  z-index: 1000;
+}
+.p-toast a {
+  color: #ffb380;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 @media (max-width: 900px) {
   .p-page {
     padding: 20px 16px;

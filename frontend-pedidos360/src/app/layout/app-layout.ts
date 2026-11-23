@@ -1,12 +1,15 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
+import { CartService } from '../core/cart.service';
 
 interface NavItem {
   path: string;
   icon: string;
   label: string;
   exact?: boolean;
+  /** Muestra el número de productos del carrito. */
+  cart?: boolean;
 }
 
 /** Estructura común: barra lateral con menú según el rol y sesión, y el contenido de la ruta. */
@@ -18,6 +21,7 @@ interface NavItem {
 })
 export class AppLayout {
   protected readonly auth = inject(AuthService);
+  protected readonly cart = inject(CartService);
 
   protected readonly initial = computed(() => this.auth.displayName().charAt(0).toUpperCase());
 
@@ -33,6 +37,7 @@ export class AppLayout {
     return [
       { path: '/', icon: '🏠', label: 'Inicio', exact: true },
       { path: '/catalog', icon: '🛍️', label: 'Catálogo de Productos' },
+      { path: '/carrito', icon: '🛒', label: 'Carrito', cart: true },
       ...(this.auth.isAuthenticated() ? [{ path: '/orders', icon: '📦', label: 'Mis Pedidos' }] : []),
       { path: '/tracking', icon: '🔍', label: 'Seguimiento de Envíos' },
     ];

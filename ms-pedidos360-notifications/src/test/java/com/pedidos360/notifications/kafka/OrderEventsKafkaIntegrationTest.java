@@ -76,6 +76,8 @@ class OrderEventsKafkaIntegrationTest {
     @Test
     void statusChangeSendsMailAndOtherEventsDoNot() throws Exception {
         producer.send(KafkaTopics.ORDER_EVENTS, "10", event(10, "CREATED", "CREADO", null, "a@outlook.com")).get();
+        // Pago confirmado: no genera aviso (la boleta llega por RabbitMQ).
+        producer.send(KafkaTopics.ORDER_EVENTS, "10", event(10, "STATUS_CHANGED", "CREADO", "PENDIENTE_PAGO", "a@outlook.com")).get();
         producer.send(KafkaTopics.ORDER_EVENTS, "10", event(10, "STATUS_CHANGED", "ACEPTADO", "CREADO", "a@outlook.com")).get();
 
         await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> verify(mailSender, times(1)).send(any(MimeMessage.class)));

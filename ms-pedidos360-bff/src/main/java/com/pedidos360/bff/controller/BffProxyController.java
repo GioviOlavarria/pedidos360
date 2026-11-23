@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -15,9 +16,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /**
- * Reenvía /api/catalog/** y /api/orders/** a los microservicios internos.
+ * Reenvía /api/catalog/**, /api/orders/** y /api/payments/** a los microservicios internos.
  * Propaga tal cual el código HTTP y el cuerpo de la respuesta (400, 404, 409...) para que el
  * frontend pueda mostrar el mensaje real del error.
  */
@@ -28,12 +30,15 @@ public class BffProxyController {
 
     private final WebClient catalogClient;
     private final WebClient ordersClient;
+    private final WebClient paymentsClient;
 
     public BffProxyController(
             @Qualifier("webClientCatalog") WebClient catalogClient,
-            @Qualifier("webClientOrders") WebClient ordersClient) {
+            @Qualifier("webClientOrders") WebClient ordersClient,
+            @Qualifier("webClientPayments") WebClient paymentsClient) {
         this.catalogClient = catalogClient;
         this.ordersClient = ordersClient;
+        this.paymentsClient = paymentsClient;
     }
 
     @RequestMapping(value = {"/api/catalog", "/api/catalog/**"}, method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
@@ -48,6 +53,25 @@ public class BffProxyController {
                                                     @RequestBody(required = false) byte[] body,
                                                     ServerWebExchange exchange) {
         return forward(ordersClient, "orders", headers, method, body, exchange);
+    }
+
+    /**
+     * El retorno y la confirmación de Flow llegan como formulario (application/x-www-form-urlencoded), que
+     * WebFlux no entrega como @RequestBody: el cuerpo se lee crudo y se reenvía tal cual.
+     */
+    @RequestMapping(value = {"/api/payments", "/api/payments/**"}, method = {RequestMethod.GET, RequestMethod.POST})
+    public Mono<ResponseEntity<byte[]>> proxyPayments(@RequestHeader HttpHeaders headers, HttpMethod method,
+                                                      ServerWebExchange exchange) {
+        return DataBufferUtils.join(exchange.getRequest().getBody())
+                .map(buffer -> {
+                    byte[] bytes = new byte[buffer.readableByteCount()];
+                    buffer.read(bytes);
+                    DataBufferUtils.release(buffer);
+                    return bytes;
+                })
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(body -> forward(paymentsClient, "pagos", headers, method, body.orElse(null), exchange));
     }
 
     private Mono<ResponseEntity<byte[]>> forward(WebClient client, String serviceName, HttpHeaders headers,
@@ -72,6 +96,9 @@ public class BffProxyController {
                         .map(responseBody -> {
                             HttpHeaders out = new HttpHeaders();
                             response.headers().contentType().ifPresent(out::setContentType);
+                            // Redirecciones (retorno de la pasarela de pago al frontend).
+                            response.headers().header(HttpHeaders.LOCATION).stream().findFirst()
+                                    .ifPresent(location -> out.set(HttpHeaders.LOCATION, location));
                             return ResponseEntity.status(response.statusCode()).headers(out).body(responseBody);
                         }))
                 .onErrorResume(WebClientRequestException.class, e -> {

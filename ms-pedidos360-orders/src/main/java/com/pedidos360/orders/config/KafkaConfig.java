@@ -62,6 +62,17 @@ public class KafkaConfig {
                 .build();
     }
 
+    /** DLT de los resultados de pago que orders no pudo aplicar (p. ej. monto que no cubre el pedido). */
+    @Bean
+    public NewTopic paymentEventsDeadLetterTopic() {
+        return TopicBuilder.name(KafkaTopics.PAYMENT_EVENTS + KafkaTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(KafkaTopics.REPLICAS)
+                .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_DELETE)
+                .config(TopicConfig.RETENTION_MS_CONFIG, String.valueOf(Duration.ofDays(30).toMillis()))
+                .build();
+    }
+
     /**
      * Manejo de errores de todos los @KafkaListener (Spring Boot lo asigna al container factory por defecto):
      * 3 reintentos con backoff exponencial (1s, 2s, 4s) y luego el registro se publica en "&lt;tópico&gt;.DLT"

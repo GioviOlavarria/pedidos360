@@ -1,41 +1,36 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CatalogService } from '../../core/api/catalog.service';
-import { OrdersService } from '../../core/api/orders.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { apiErrorMessage, customerIdFromAccount } from '../../core/format';
-import { Order, Product } from '../../core/models';
+import { CartService } from '../../core/cart.service';
+import { apiErrorMessage } from '../../core/format';
+import { Product } from '../../core/models';
 import { ProductCard } from '../../components/product-card/product-card';
 import { ProductForm } from '../../components/product-form/product-form';
-import { MoneyPipe } from '../../shared/money.pipe';
 
-/** Catálogo: público para ver, compra para clientes y administración de inventario para el Admin. */
+/** Catálogo: público para ver, carrito para clientes y administración de inventario para el Admin. */
 @Component({
   selector: 'app-catalog-page',
-  imports: [RouterLink, ProductCard, ProductForm, MoneyPipe],
+  imports: [RouterLink, ProductCard, ProductForm],
   templateUrl: './catalog-page.html',
   styleUrl: './catalog-page.css',
 })
 export class CatalogPage implements OnInit {
   private readonly catalog = inject(CatalogService);
-  private readonly orders = inject(OrdersService);
-  private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
-
-  protected readonly customerId = computed(() => customerIdFromAccount(this.auth.account()));
+  protected readonly cart = inject(CartService);
 
   protected readonly products = signal<Product[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  /** Aviso breve al agregar al carrito. */
+  protected readonly added = signal('');
 
   // Administración
   protected readonly showForm = signal(false);
   protected readonly editing = signal<Product | null>(null);
 
-  // Compra del cliente
-  protected readonly buying = signal<{ product: Product; quantity: number } | null>(null);
-  protected readonly purchasing = signal(false);
-  protected readonly purchased = signal<Order | null>(null);
+  private addedTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
     this.loadProducts();
@@ -73,36 +68,10 @@ export class CatalogPage implements OnInit {
     });
   }
 
-  protected startBuy(selection: { product: Product; quantity: number }): void {
-    if (!this.auth.isAuthenticated()) {
-      if (window.confirm('Para realizar una compra debe iniciar sesión con su cuenta. ¿Desea iniciar sesión ahora?')) {
-        void this.router.navigateByUrl('/login');
-      }
-      return;
-    }
-    this.purchased.set(null);
-    this.buying.set(selection);
-  }
-
-  protected confirmPurchase(): void {
-    const selection = this.buying();
-    if (!selection) return;
-    this.purchasing.set(true);
-    this.orders.purchase(selection.product, selection.quantity, this.customerId()).subscribe({
-      next: (order) => {
-        this.purchased.set(order);
-        this.purchasing.set(false);
-        this.loadProducts(); // refrescar stock en pantalla
-      },
-      error: (err) => {
-        this.purchasing.set(false);
-        window.alert(apiErrorMessage(err, 'Ocurrió un error al procesar la compra. Intente nuevamente.'));
-      },
-    });
-  }
-
-  protected closePurchase(): void {
-    this.buying.set(null);
-    this.purchased.set(null);
+  protected addToCart(selection: { product: Product; quantity: number }): void {
+    this.cart.add(selection.product, selection.quantity);
+    this.added.set(`${selection.quantity} × ${selection.product.name} agregado al carrito`);
+    clearTimeout(this.addedTimer);
+    this.addedTimer = setTimeout(() => this.added.set(''), 3000);
   }
 }

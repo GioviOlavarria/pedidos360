@@ -3,7 +3,7 @@ package com.pedidos360.orders.api;
 import com.pedidos360.orders.client.CatalogClient;
 import com.pedidos360.orders.client.CatalogClient.ReservedItem;
 import com.pedidos360.orders.config.RabbitMQConfig;
-import com.pedidos360.orders.messaging.OrderCreatedEvent;
+import com.pedidos360.orders.messaging.OrderPaidEvent;
 import com.pedidos360.orders.repository.OrderRepository;
 import com.pedidos360.orders.messaging.kafka.KafkaTopics;
 import com.pedidos360.orders.messaging.kafka.OrderEventMessage;
@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -88,16 +89,16 @@ class OrderApiTest {
     }
 
     @Test
-    void customerBuysWithCatalogPriceAndEventsArePublished() throws Exception {
+    void customerBuysWithCatalogPriceAndOrderWaitsForPayment() throws Exception {
         mvc.perform(post("/api/orders").with(customer("cliente@outlook.com"))
                         .contentType(MediaType.APPLICATION_JSON).content(ORDER_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.total").value(5980.00))
-                .andExpect(jsonPath("$.status").value("CREADO"))
+                .andExpect(jsonPath("$.status").value("PENDIENTE_PAGO"))
                 .andExpect(jsonPath("$.items[0].productName").value("Caja"));
 
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.EXCHANGE),
-                eq(RabbitMQConfig.ROUTING_KEY_ORDER_CREATED), any(OrderCreatedEvent.class));
+        // Sin pago confirmado todavía no hay boleta.
+        verifyNoInteractions(rabbitTemplate);
         Long orderId = repository.findAll().getFirst().getId();
         ArgumentCaptor<ProducerRecord<String, Object>> record = ArgumentCaptor.forClass(ProducerRecord.class);
         verify(kafkaTemplate).send(record.capture());
@@ -139,6 +140,15 @@ class OrderApiTest {
         long id = buy("a@outlook.com");
 
         mvc.perform(patch("/api/orders/" + id + "/status").param("status", "ACEPTADO").with(admin()))
+                .andExpect(status().isBadRequest());
+        // El Admin registra un pago manual: el pedido pasa a CREADO y se emite la boleta.
+        mvc.perform(patch("/api/orders/" + id + "/status").param("status", "CREADO").with(admin()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CREADO"))
+                .andExpect(jsonPath("$.paymentReference").value("MANUAL-ADMIN"));
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.EXCHANGE),
+                eq(RabbitMQConfig.ROUTING_KEY_ORDER_PAID), any(OrderPaidEvent.class));
+
+        mvc.perform(patch("/api/orders/" + id + "/status").param("status", "ACEPTADO").with(admin()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACEPTADO"));
         mvc.perform(patch("/api/orders/" + id + "/status").param("status", "ENTREGADO").with(admin()))
                 .andExpect(status().isBadRequest());
@@ -162,5 +172,16 @@ class OrderApiTest {
     private static RequestPostProcessor admin() {
         return jwt().jwt(j -> j.claim("preferred_username", "gi.olavarria@duocuc.cl"))
                 .authorities(new SimpleGrantedAuthority("ROLE_Admin"), new SimpleGrantedAuthority("ROLE_Customer"));
+    }
+
+    @Test
+    void internalPaymentInfoRequiresApiKey() throws Exception {
+        long id = buy("a@outlook.com");
+        mvc.perform(get("/internal/orders/" + id)).andExpect(status().isForbidden());
+        mvc.perform(get("/internal/orders/" + id).header("X-Internal-Api-Key", "test-internal-key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDIENTE_PAGO"))
+                .andExpect(jsonPath("$.customerEmail").value("a@outlook.com"))
+                .andExpect(jsonPath("$.total").value(5980.00));
     }
 }

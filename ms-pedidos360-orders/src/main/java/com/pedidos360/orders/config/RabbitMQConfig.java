@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Topología RabbitMQ del flujo "pedido creado -> boleta por correo".
+ * Topología RabbitMQ del flujo "pedido pagado -> boleta por correo".
  *
  * Se declara de forma idéntica en orders y en notifications para que, aunque notifications
  * aún no haya arrancado, los mensajes publicados queden en la cola y no se pierdan.
@@ -19,7 +19,8 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     public static final String EXCHANGE = "pedidos360.orders.exchange";
-    public static final String ROUTING_KEY_ORDER_CREATED = "order.created";
+    /** El pedido se pagó: dispara la emisión de la boleta. */
+    public static final String ROUTING_KEY_ORDER_PAID = "order.paid";
     public static final String QUEUE_BOLETA = "pedidos360.notifications.boleta";
     public static final String DLX = "pedidos360.orders.dlx";
     public static final String QUEUE_BOLETA_DLQ = "pedidos360.notifications.boleta.dlq";
@@ -50,7 +51,7 @@ public class RabbitMQConfig {
 
     @Bean
     public Binding boletaBinding() {
-        return BindingBuilder.bind(boletaQueue()).to(ordersExchange()).with(ROUTING_KEY_ORDER_CREATED);
+        return BindingBuilder.bind(boletaQueue()).to(ordersExchange()).with(ROUTING_KEY_ORDER_PAID);
     }
 
     @Bean

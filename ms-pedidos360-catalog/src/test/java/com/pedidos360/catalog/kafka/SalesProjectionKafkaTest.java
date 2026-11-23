@@ -62,6 +62,8 @@ class SalesProjectionKafkaTest {
 
     @Test
     void projectsSalesAndIsIdempotentAndHandlesCancellation() throws Exception {
+        // Un pedido aún sin pagar no es venta.
+        producer.send(KafkaTopics.ORDER_EVENTS, "3", event(3, "CREATED", "PENDIENTE_PAGO", 50)).get();
         String created = event(1, "CREATED", "CREADO", 3);
         producer.send(KafkaTopics.ORDER_EVENTS, "1", created).get();
         producer.send(KafkaTopics.ORDER_EVENTS, "1", created).get(); // reentrega: no debe duplicar

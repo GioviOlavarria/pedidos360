@@ -2,7 +2,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { Product } from '../../core/models';
 import { MoneyPipe } from '../../shared/money.pipe';
 
-/** Tarjeta de producto: el Admin edita o elimina; el cliente elige cantidad y compra. */
+/** Tarjeta de producto: el Admin edita o elimina; el cliente elige cantidad y lo agrega al carrito. */
 @Component({
   selector: 'app-product-card',
   imports: [MoneyPipe],
@@ -15,7 +15,7 @@ export class ProductCard {
 
   readonly edit = output<Product>();
   readonly remove = output<Product>();
-  readonly buy = output<{ product: Product; quantity: number }>();
+  readonly addToCart = output<{ product: Product; quantity: number }>();
 
   protected readonly quantity = signal(1);
 

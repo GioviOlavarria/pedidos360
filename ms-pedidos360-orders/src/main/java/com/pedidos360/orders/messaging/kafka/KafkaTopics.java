@@ -9,6 +9,8 @@ package com.pedidos360.orders.messaging.kafka;
  *       Política delete con retención de 7 días: es un flujo de eventos para analítica y reacciones de otros servicios.</li>
  *   <li>{@link #BILLING_RECEIPTS}: boleta electrónica emitida para cada pedido. Política compact: con la clave
  *       orderId Kafka conserva siempre la última boleta de cada pedido.</li>
+ *   <li>{@link #PAYMENT_EVENTS}: resultado de cada pago (Flow) publicado por payments; orders lo consume para
+ *       marcar el pedido como pagado o cancelarlo. Retención de 30 días (trazabilidad de pagos).</li>
  * </ul>
  * Los mensajes que fallan tras los reintentos se publican en el tópico con sufijo {@link #DLT_SUFFIX}.
  */
@@ -16,6 +18,7 @@ public final class KafkaTopics {
 
     public static final String ORDER_EVENTS = "pedidos360.orders.events";
     public static final String BILLING_RECEIPTS = "pedidos360.billing.receipts";
+    public static final String PAYMENT_EVENTS = "pedidos360.payments.events";
     public static final String DLT_SUFFIX = ".DLT";
 
     public static final int PARTITIONS = 3;

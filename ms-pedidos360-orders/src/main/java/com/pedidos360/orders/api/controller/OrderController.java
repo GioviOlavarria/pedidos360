@@ -72,6 +72,8 @@ public class OrderController {
                 order.getTotal()
         );
         response.setCustomerName(order.getCustomerName());
+        response.setPaidAt(order.getPaidAt());
+        response.setPaymentReference(order.getPaymentReference());
         response.setReceiptFolio(order.getReceiptFolio());
         response.setReceiptTrackId(order.getReceiptTrackId());
         response.setReceiptSiiStatus(order.getReceiptSiiStatus());

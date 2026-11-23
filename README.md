@@ -32,12 +32,14 @@ Plataforma integral de gestión de pedidos y catálogo para e-commerce. Desarrol
     +-----> [API] ms-pedidos360-orders  (Puerto 8081) ---> [BD MySQL]
 
 Mensajería
-  RabbitMQ (3 nodos, colas quorum + DLQ)  orders --order.created--> notifications (boleta por correo)
+  RabbitMQ (3 nodos, colas quorum + DLQ)  orders --order.paid--> notifications (boleta por correo)
   Kafka (ZooKeeper + 2 brokers)           orders --pedidos360.orders.events--> catalog, notifications
                                           notifications --pedidos360.billing.receipts--> orders
 Administración
   ms-pedidos360-kafka-admin  (8084)  tópicos, configuraciones, brokers y consumer groups
   ms-pedidos360-rabbit-admin (8086)  colas, exchanges y bindings
+Pagos
+  ms-pedidos360-payments (8087)      Flow (o pasarela simulada) → Kafka pedidos360.payments.events → orders
   Kafka UI (8085) · RabbitMQ Management (15672) · MailHog (8025)
 ```
 
@@ -115,7 +117,7 @@ El backend valida que cada token haya sido emitido **para esta API** (`aud`) por
 ```text
 Cliente compra ──> BFF ──> orders ──(reserva stock, precios reales)──> catalog
                              │
-                             └─ tras guardar el pedido publica "order.created"
+                             └─ cuando se confirma el PAGO publica "order.paid"
                                          │
                         RabbitMQ (cluster 3 nodos, cola quorum)
                                          │
@@ -128,6 +130,44 @@ Cliente compra ──> BFF ──> orders ──(reserva stock, precios reales)�
 - Por defecto los correos van a **MailHog**: ábrelos en `http://localhost:8025`. Para enviar correos reales, configura las variables `MAIL_*` en `infra/.env` (ver `infra/.env.example`).
 - Panel de RabbitMQ: `http://localhost:15672` (usuario/clave `RABBITMQ_USER` / `RABBITMQ_PASSWORD`).
 
+## Compras y pagos con Flow
+
+El cliente arma un **carrito** y paga en **Flow** (Webpay, tarjetas, transferencias). El cobro lo hace el
+microservicio `ms-pedidos360-payments` (puerto 8087, expuesto por el BFF en `/api/payments`).
+
+```text
+Carrito ──> POST /api/orders ──> pedido PENDIENTE_PAGO (stock reservado)
+        ──> POST /api/payments ──> payments valida el pedido con orders (dueño, estado, monto)
+                                   y crea la orden en Flow (payment/create, firma HMAC-SHA256)
+        ──> el navegador va a Flow y paga
+Flow ──> POST /api/payments/flow/return (y /confirmation) ──> payments consulta payment/getStatus
+     ──> Kafka pedidos360.payments.events ──> orders: PENDIENTE_PAGO → CREADO ──> RabbitMQ order.paid
+                                                ──> notifications: boleta SII + correo
+     ──> el comprador ve /checkout/resultado (pago confirmado, folio de la boleta)
+```
+
+- **Rechazado o anulado** en Flow → el pedido se cancela y el stock vuelve al catálogo.
+- **Sin pagar en 30 minutos** (`PAYMENT_EXPIRATION`) → orders cancela el pedido y libera el stock. La orden de Flow expira antes (20 min).
+- El monto siempre sale del servidor; si Flow informa otro monto, el pago se rechaza. Si orders recibe un pago que no cubre el total, el evento va al DLT.
+- Si Kafka no confirma la publicación del resultado, payments lo reintenta cada 30 s (orders lo aplica de forma idempotente).
+- El Admin puede registrar un **pago manual** (p. ej. transferencia) desde el detalle del pedido: pasa a `CREADO` y se emite la boleta.
+
+### Configurar Flow
+
+1. Crear una cuenta en **https://sandbox.flow.cl** (pruebas, gratis) y copiar `apiKey` y `secretKey` desde *Mis datos → Seguridad*.
+2. En `infra/.env`:
+   ```
+   PAYMENT_PROVIDER=flow
+   FLOW_API_URL=https://sandbox.flow.cl/api
+   FLOW_API_KEY=...
+   FLOW_SECRET_KEY=...
+   ```
+3. `docker compose up -d --build payments`.
+
+Mientras no haya cuenta, `PAYMENT_PROVIDER=simulado` (valor por defecto) muestra una **pasarela de prueba** en `/checkout/simulado` con los botones *Pagar* y *Rechazar*. El resto del flujo (Kafka, boleta, correo) es idéntico.
+
+La **confirmación servidor a servidor** de Flow (`urlConfirmation`) necesita una URL pública: en local se puede exponer el BFF con un túnel (p. ej. `ngrok http 8080`) y definir `PAYMENTS_PUBLIC_URL` con esa URL. Sin túnel el pago igual se confirma cuando Flow devuelve al comprador (`urlReturn`) y desde `/checkout/resultado`, que vuelve a consultar el estado en Flow.
+
 ## Kafka: streaming de eventos
 
 Kafka **complementa** a RabbitMQ sin reemplazarlo: RabbitMQ sigue siendo la cola de trabajo de la boleta (un mensaje, un consumidor, DLQ), mientras Kafka guarda el **historial de eventos** del pedido para que varios servicios lo lean de forma independiente (analítica y reacciones), con retención y posibilidad de reprocesar.
@@ -138,6 +178,7 @@ Kafka **complementa** a RabbitMQ sin reemplazarlo: RabbitMQ sigue siendo la cola
 | --- | --- | --- | --- | --- |
 | `pedidos360.orders.events` | `orders` (CREATED, UPDATED, STATUS_CHANGED, DELETED) | `pedidos360-catalog-sales` (catalog), `pedidos360-notifications` (notifications) | 3 / 2 | `cleanup.policy=delete`, `retention.ms` = 7 días, `min.insync.replicas=1` |
 | `pedidos360.billing.receipts` | `notifications` (boleta emitida) | `pedidos360-orders` (orders) | 3 / 2 | `cleanup.policy=compact` (última boleta por pedido), `min.compaction.lag.ms` = 1 min, `segment.ms` = 1 h |
+| `pedidos360.payments.events` | `payments` (resultado del pago en Flow) | `pedidos360-orders` (orders) | 3 / 2 | `cleanup.policy=delete`, `retention.ms` = 30 días |
 | `*.DLT` | error handler de cada consumidor | revisión manual | 1 / 2 | `cleanup.policy=delete`, `retention.ms` = 30 días |
 
 - **Clave = id del pedido**: todos los eventos de un pedido van a la misma partición y se consumen en orden.

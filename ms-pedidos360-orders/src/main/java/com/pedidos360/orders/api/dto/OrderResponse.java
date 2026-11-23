@@ -13,6 +13,8 @@ public class OrderResponse {
     private BigDecimal total;
     private String customerName;
     private java.util.List<OrderItemResponse> items;
+    private java.time.Instant paidAt;
+    private String paymentReference;
     private Long receiptFolio;
     private String receiptTrackId;
     private String receiptSiiStatus;
@@ -115,5 +117,21 @@ public class OrderResponse {
 
     public void setReceiptIssuedAt(java.time.Instant receiptIssuedAt) {
         this.receiptIssuedAt = receiptIssuedAt;
+    }
+
+    public java.time.Instant getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(java.time.Instant paidAt) {
+        this.paidAt = paidAt;
+    }
+
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    public void setPaymentReference(String paymentReference) {
+        this.paymentReference = paymentReference;
     }
 }

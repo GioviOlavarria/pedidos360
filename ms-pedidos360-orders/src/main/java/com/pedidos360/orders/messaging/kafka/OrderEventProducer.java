@@ -1,7 +1,6 @@
 package com.pedidos360.orders.messaging.kafka;
 
 import com.pedidos360.orders.messaging.OrderChangedEvent;
-import com.pedidos360.orders.messaging.OrderCreatedEvent;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,15 +32,6 @@ public class OrderEventProducer {
 
     public OrderEventProducer(KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
-    }
-
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onOrderCreated(OrderCreatedEvent event) {
-        List<OrderEventMessage.Item> items = event.items().stream()
-                .map(i -> new OrderEventMessage.Item(i.productId(), i.productName(), i.quantity(), i.unitPrice(), i.subtotal()))
-                .toList();
-        publish(new OrderEventMessage(UUID.randomUUID(), OrderEventType.CREATED, event.orderId(), "CREADO", null,
-                event.customerEmail(), event.customerName(), event.total(), items, Instant.now()));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

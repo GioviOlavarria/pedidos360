@@ -4,7 +4,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CatalogService } from '../../core/api/catalog.service';
 import { OrdersService } from '../../core/api/orders.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { apiErrorMessage, customerIdFromAccount } from '../../core/format';
+import { CartService } from '../../core/cart.service';
+import { apiErrorMessage } from '../../core/format';
 import { Order, OrderStatus, Product } from '../../core/models';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { StatusBadge } from '../../shared/status-badge';
@@ -31,6 +32,7 @@ export class HomePage implements OnInit {
   private readonly catalog = inject(CatalogService);
   private readonly orders = inject(OrdersService);
   private readonly router = inject(Router);
+  protected readonly cart = inject(CartService);
   private readonly route = inject(ActivatedRoute);
   protected readonly auth = inject(AuthService);
 
@@ -49,9 +51,9 @@ export class HomePage implements OnInit {
   protected readonly loadingProducts = signal(true);
   protected readonly search = signal('');
   protected readonly quantities = signal<Record<number, number>>({});
-  protected readonly selected = signal<{ product: Product; quantity: number } | null>(null);
-  protected readonly purchasing = signal(false);
-  protected readonly purchased = signal<Order | null>(null);
+  /** Aviso breve al agregar al carrito. */
+  protected readonly added = signal('');
+  private addedTimer?: ReturnType<typeof setTimeout>;
 
   protected readonly filteredProducts = computed(() => {
     const term = this.search().toLowerCase();
@@ -113,32 +115,12 @@ export class HomePage implements OnInit {
     }));
   }
 
-  protected select(product: Product): void {
-    this.selected.set({ product, quantity: this.qty(product) });
-  }
-
-  protected confirmPurchase(): void {
-    const selection = this.selected();
-    if (!selection) return;
-    if (!this.auth.isAuthenticated()) {
-      void this.router.navigateByUrl('/login');
-      return;
-    }
-    this.purchasing.set(true);
-    const customerId = customerIdFromAccount(this.auth.account());
-    this.orders.purchase(selection.product, selection.quantity, customerId).subscribe({
-      next: (order) => {
-        this.purchased.set(order);
-        this.purchasing.set(false);
-        this.selected.set(null);
-        this.loadProducts();
-      },
-      error: (err) => {
-        this.purchasing.set(false);
-        this.selected.set(null);
-        window.alert(apiErrorMessage(err, 'No se pudo registrar la compra. Intente nuevamente.'));
-      },
-    });
+  protected addToCart(product: Product): void {
+    const quantity = this.qty(product);
+    this.cart.add(product, quantity);
+    this.added.set(`${quantity} × ${product.name} agregado al carrito`);
+    clearTimeout(this.addedTimer);
+    this.addedTimer = setTimeout(() => this.added.set(''), 3000);
   }
 
   protected track(idToSearch?: string): void {
@@ -166,13 +148,5 @@ export class HomePage implements OnInit {
         this.loadingTracking.set(false);
       },
     });
-  }
-
-  protected trackPurchased(): void {
-    const order = this.purchased();
-    this.purchased.set(null);
-    if (!order) return;
-    this.goTo('tracking', 'segmento-seguimiento');
-    this.track(String(order.id));
   }
 }

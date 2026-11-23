@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { OrdersService } from '../../core/api/orders.service';
+import { CheckoutService } from '../../core/checkout.service';
 import { apiErrorMessage } from '../../core/format';
 import { NEXT_STATUS, STATUS_STEPS, statusLabel } from '../../core/order-status';
 import { Order, OrderStatus } from '../../core/models';
@@ -15,6 +16,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 })
 export class OrderDetail {
   private readonly orders = inject(OrdersService);
+  private readonly checkout = inject(CheckoutService);
 
   readonly orderId = input.required<number>();
   readonly isAdmin = input(false);
@@ -26,6 +28,7 @@ export class OrderDetail {
   protected readonly order = signal<Order | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  protected readonly paying = signal(false);
 
   protected readonly steps = STATUS_STEPS;
   protected readonly label = statusLabel;
@@ -59,10 +62,26 @@ export class OrderDetail {
     });
   }
 
+  /** El cliente paga (o reintenta pagar) un pedido pendiente: se va a Flow. */
+  protected payNow(): void {
+    const order = this.order();
+    if (!order) return;
+    this.paying.set(true);
+    this.checkout.payOrderUrl(order.id).subscribe({
+      next: (url) => this.checkout.goToGateway(url),
+      error: (err) => {
+        this.paying.set(false);
+        window.alert(apiErrorMessage(err, 'No se pudo iniciar el pago.'));
+      },
+    });
+  }
+
   protected changeStatus(status: OrderStatus): void {
     const order = this.order();
     if (!order) return;
     if (status === 'CANCELADO' && !window.confirm(`¿Cancelar el pedido #${order.id}? Se devolverá el stock.`)) return;
+    if (order.status === 'PENDIENTE_PAGO' && status === 'CREADO'
+      && !window.confirm(`¿Registrar que el pedido #${order.id} se pagó fuera de Flow (p. ej. transferencia)? Se emitirá la boleta.`)) return;
     this.orders.updateStatus(order.id, status).subscribe({
       next: (updated) => {
         this.order.set(updated);

@@ -12,7 +12,8 @@ import static org.springframework.security.test.web.reactive.server.SecurityMock
         "app.security.api-client-id=00000000-0000-0000-0000-000000000001",
         // Puerto cerrado: simula que el microservicio está caído.
         "app.services.orders.url=http://localhost:1",
-        "app.services.catalog.url=http://localhost:1"
+        "app.services.catalog.url=http://localhost:1",
+        "app.services.payments.url=http://localhost:1"
 })
 @AutoConfigureWebTestClient
 class MsPedidos360BffApplicationTests {
@@ -28,6 +29,17 @@ class MsPedidos360BffApplicationTests {
     @Test
     void unknownPathsAreDenied() {
         client.mutateWith(mockJwt()).get().uri("/internal/stock/reserve").exchange().expectStatus().isForbidden();
+    }
+
+    @Test
+    void paymentsRequireLoginExceptGatewayCallbacks() {
+        client.post().uri("/api/payments").bodyValue("{}").exchange().expectStatus().isUnauthorized();
+        // El retorno de Flow llega sin JWT: el BFF lo deja pasar (aquí payments está caído → 503, no 401).
+        client.post().uri("/api/payments/flow/return?token=x").exchange().expectStatus().isEqualTo(503);
+        // Flow envía el token como formulario: no debe responder 415.
+        client.post().uri("/api/payments/flow/return")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("token=abc").exchange().expectStatus().isEqualTo(503);
     }
 
     @Test

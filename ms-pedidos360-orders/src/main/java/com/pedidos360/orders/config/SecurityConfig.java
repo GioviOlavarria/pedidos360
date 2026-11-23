@@ -41,6 +41,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // Servicio a servicio (payments): protegido con X-Internal-Api-Key, no se expone por el BFF.
+                        .requestMatchers("/internal/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()

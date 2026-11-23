@@ -26,10 +26,10 @@ public class OrderEventPublisher {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onOrderCreated(OrderCreatedEvent event) {
+    public void onOrderPaid(OrderPaidEvent event) {
         try {
-            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.ROUTING_KEY_ORDER_CREATED, event);
-            log.info("Evento order.created publicado para pedido #{} ({})", event.orderId(), event.customerEmail());
+            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.ROUTING_KEY_ORDER_PAID, event);
+            log.info("Evento order.paid publicado para pedido #{} ({})", event.orderId(), event.customerEmail());
         } catch (AmqpException e) {
             log.error("No se pudo publicar el evento del pedido #{} en RabbitMQ: {}", event.orderId(), e.getMessage());
         }

@@ -2,7 +2,7 @@
 
 export type Role = 'Admin' | 'Operator' | 'Customer';
 
-export type OrderStatus = 'CREADO' | 'ACEPTADO' | 'EN_PREPARACION' | 'DESPACHADO' | 'ENTREGADO' | 'CANCELADO';
+export type OrderStatus = 'PENDIENTE_PAGO' | 'CREADO' | 'ACEPTADO' | 'EN_PREPARACION' | 'DESPACHADO' | 'ENTREGADO' | 'CANCELADO';
 
 export interface Product {
   id: number;
@@ -44,11 +44,38 @@ export interface Order {
   total: number;
   customerName?: string | null;
   items?: OrderItem[];
+  /** Pago confirmado (Flow o manual del Admin). */
+  paidAt?: string | null;
+  paymentReference?: string | null;
   /** Boleta electrónica SII registrada vía Kafka. */
   receiptFolio?: number | null;
   receiptTrackId?: string | null;
   receiptSiiStatus?: string | null;
   receiptIssuedAt?: string | null;
+}
+
+export type PaymentStatus = 'PENDING' | 'PAID' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
+
+/** Intento de pago en la pasarela (ms-pedidos360-payments). */
+export interface Payment {
+  id: number;
+  orderId: number;
+  status: PaymentStatus;
+  amount: number;
+  provider: 'FLOW' | 'SIMULADO';
+  providerReference: string | null;
+  paymentMethod: string | null;
+  redirectUrl: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface CartItem {
+  productId: number;
+  name: string;
+  price: number;
+  stock: number;
+  quantity: number;
 }
 
 export interface OrderRequest {

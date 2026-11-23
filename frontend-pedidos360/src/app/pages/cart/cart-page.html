@@ -1,0 +1,78 @@
+<div class="p-page">
+  <header class="p-page-header">
+    <div>
+      <h1 class="p-title">🛒 Carrito de Compras</h1>
+      <p class="p-subtitle">Revise los productos y pague de forma segura con Flow (Webpay, tarjetas y transferencias).</p>
+    </div>
+    <a routerLink="/catalog" class="p-btn p-btn-light">← Seguir comprando</a>
+  </header>
+
+  @if (cart.items().length === 0) {
+    <div class="empty">
+      <div class="empty-icon">🛒</div>
+      <p><strong>Su carrito está vacío.</strong></p>
+      <a routerLink="/catalog" class="p-btn p-btn-primary">Ver catálogo</a>
+    </div>
+  } @else {
+    <div class="layout">
+      <section class="p-card">
+        <table class="p-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="num">Precio</th>
+              <th class="center">Cantidad</th>
+              <th class="num">Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of cart.items(); track item.productId) {
+              <tr>
+                <td class="name">{{ item.name }}<small>Disponible: {{ item.stock }} un.</small></td>
+                <td class="num">{{ item.price | money }}</td>
+                <td class="center">
+                  <div class="p-qty-controls">
+                    <button type="button" (click)="changeQuantity(item.productId, item.quantity - 1)"
+                      [disabled]="item.quantity <= 1">-</button>
+                    <strong>{{ item.quantity }}</strong>
+                    <button type="button" (click)="changeQuantity(item.productId, item.quantity + 1)"
+                      [disabled]="item.quantity >= item.stock">+</button>
+                  </div>
+                </td>
+                <td class="num strong">{{ item.price * item.quantity | money }}</td>
+                <td class="center">
+                  <button type="button" class="remove" (click)="cart.remove(item.productId)" aria-label="Quitar">✕</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <aside class="p-card summary">
+        <h2 class="p-card-title">Resumen</h2>
+        <div class="p-summary-row"><span>Productos</span><span>{{ cart.count() }} un.</span></div>
+        <div class="p-summary-row"><span>Envío</span><span>Gratis</span></div>
+        <div class="p-summary-total"><span>Total</span><strong>{{ cart.total() | money }}</strong></div>
+        <p class="note">IVA incluido. La boleta electrónica se emite al confirmar el pago y llega a su correo.</p>
+
+        @if (error()) {
+          <p class="p-form-error">{{ error() }}</p>
+        }
+
+        <button type="button" class="p-btn p-btn-primary p-btn-block pay" (click)="pay()" [disabled]="paying()">
+          @if (paying()) {
+            Redirigiendo a la pasarela...
+          } @else if (auth.isAuthenticated()) {
+            🔒 Pagar {{ cart.total() | money }}
+          } @else {
+            🔑 Iniciar sesión para pagar
+          }
+        </button>
+        <div class="flow">Pago procesado por <strong>Flow</strong></div>
+        <button type="button" class="clear" (click)="cart.clear()">Vaciar carrito</button>
+      </aside>
+    </div>
+  }
+</div>

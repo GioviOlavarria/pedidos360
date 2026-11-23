@@ -25,6 +25,9 @@
             <a [routerLink]="item.path" routerLinkActive="active"
               [routerLinkActiveOptions]="{ exact: item.exact ?? false }">
               <span class="nav-icon">{{ item.icon }}</span>{{ item.label }}
+              @if (item.cart && cart.count() > 0) {
+                <span class="cart-count">{{ cart.count() }}</span>
+              }
             </a>
           </li>
         }

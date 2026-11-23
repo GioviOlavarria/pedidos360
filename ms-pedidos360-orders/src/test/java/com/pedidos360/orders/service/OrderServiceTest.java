@@ -12,7 +12,9 @@ import com.pedidos360.orders.domain.model.exception.InvalidOrderStateException;
 import com.pedidos360.orders.domain.model.exception.StockUnavailableException;
 import com.pedidos360.orders.domain.model.service.CurrentUser;
 import com.pedidos360.orders.domain.model.service.OrderService;
-import com.pedidos360.orders.messaging.OrderCreatedEvent;
+import com.pedidos360.orders.messaging.OrderChangedEvent;
+import com.pedidos360.orders.messaging.OrderPaidEvent;
+import com.pedidos360.orders.messaging.kafka.OrderEventType;
 import com.pedidos360.orders.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -119,14 +121,62 @@ class OrderServiceTest {
 
         assertEquals(new BigDecimal("8970.00"), result.getTotal());
         assertEquals("cliente@outlook.com", result.getCustomerEmail());
-        assertEquals(OrderStatus.CREADO, result.getStatus());
+        assertEquals(OrderStatus.PENDIENTE_PAGO, result.getStatus());
         assertEquals("Caja", result.getItems().get(0).getProductName());
 
-        ArgumentCaptor<OrderCreatedEvent> event = ArgumentCaptor.forClass(OrderCreatedEvent.class);
+        // Al crear solo se anuncia el pedido (Kafka); la boleta espera el pago.
+        ArgumentCaptor<Object> event = ArgumentCaptor.forClass(Object.class);
         verify(eventPublisher).publishEvent(event.capture());
-        assertEquals(10L, event.getValue().orderId());
-        assertEquals("cliente@outlook.com", event.getValue().customerEmail());
-        assertEquals(new BigDecimal("8970.00"), event.getValue().items().get(0).subtotal());
+        OrderChangedEvent created = assertInstanceOf(OrderChangedEvent.class, event.getValue());
+        assertEquals(OrderEventType.CREATED, created.type());
+        assertEquals(new BigDecimal("8970.00"), created.items().get(0).subtotal());
+    }
+
+    @Test
+    @DisplayName("Pago confirmado: el pedido pasa a CREADO y se publica la boleta una sola vez")
+    void testMarkPaidPublishesBoletaOnce() {
+        Order pending = pendingOrder();
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(pending));
+        when(orderRepository.save(pending)).thenReturn(pending);
+
+        orderService.markPaid(5L, "FLOW-99", java.time.Instant.now());
+        orderService.markPaid(5L, "FLOW-99", java.time.Instant.now());
+
+        assertEquals(OrderStatus.CREADO, pending.getStatus());
+        assertEquals("FLOW-99", pending.getPaymentReference());
+        ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, times(2)).publishEvent(events.capture());
+        assertEquals(1, events.getAllValues().stream().filter(OrderPaidEvent.class::isInstance).count());
+    }
+
+    @Test
+    @DisplayName("Pago rechazado: se cancela el pedido y se devuelve el stock")
+    void testRejectedPaymentCancelsAndReleasesStock() {
+        Order pending = pendingOrder();
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(pending));
+
+        orderService.applyPaymentResult(5L, "REJECTED", BigDecimal.ZERO, "FLOW-1", java.time.Instant.now());
+
+        assertEquals(OrderStatus.CANCELADO, pending.getStatus());
+        verify(catalogClient).release(List.of(new StockItem(7L, 2)));
+    }
+
+    @Test
+    @DisplayName("Un pago menor al total del pedido es inválido")
+    void testPaymentBelowTotalIsRejected() {
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(pendingOrder()));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                orderService.applyPaymentResult(5L, "PAID", new BigDecimal("100"), "FLOW-1", java.time.Instant.now()));
+        verifyNoInteractions(eventPublisher);
+    }
+
+    private static Order pendingOrder() {
+        Order order = new Order(100L, OrderStatus.PENDIENTE_PAGO, LocalDateTime.now(), new BigDecimal("5980.00"));
+        order.setId(5L);
+        order.setCustomerEmail("cliente@outlook.com");
+        order.addItem(new OrderItem(7L, "Caja", 2, new BigDecimal("2990.00")));
+        return order;
     }
 
     @Test

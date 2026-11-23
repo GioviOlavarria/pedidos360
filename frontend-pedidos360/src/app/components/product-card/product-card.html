@@ -35,8 +35,8 @@
           </div>
         </div>
         <button type="button" class="p-btn p-btn-primary p-btn-block"
-          (click)="buy.emit({ product: product(), quantity: quantity() })">
-          🛒 Comprar {{ quantity() > 1 ? '(' + quantity() + ')' : '' }} · {{ product().price * quantity() | money }}
+          (click)="addToCart.emit({ product: product(), quantity: quantity() })">
+          🛒 Agregar al carrito {{ quantity() > 1 ? '(' + quantity() + ')' : '' }} · {{ product().price * quantity() | money }}
         </button>
       </div>
     } @else {
