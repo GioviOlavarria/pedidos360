@@ -132,10 +132,20 @@ services:
       RABBITMQ_USER:     ${RABBITMQ_USER:-pedidos360}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-pedidos360rabbit}
       RABBITMQ_MANAGEMENT_URL: http://rabbitmq1:15672
+      # Validación del JWT de Microsoft Entra ID (rol Admin) en /api/**
+      API_CLIENT_ID:    ${API_CLIENT_ID}
+      ADMIN_EMAILS:     ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
+      ADMIN_TENANT_ID:  ${ADMIN_TENANT_ID:-}
     ports:
       - "127.0.0.1:${RABBIT_ADMIN_PORT:-8086}:8086"
     networks:
       - pedidos360-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8086/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   orders:
     build:
@@ -395,12 +405,16 @@ services:
     environment:
       KAFKA_ADMIN_BIND_ADDRESS: 0.0.0.0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29092
+      # Validación del JWT de Microsoft Entra ID (rol Admin) en /api/**
+      API_CLIENT_ID:    ${API_CLIENT_ID}
+      ADMIN_EMAILS:     ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
+      ADMIN_TENANT_ID:  ${ADMIN_TENANT_ID:-}
     ports:
       - "127.0.0.1:${KAFKA_ADMIN_PORT:-8084}:8084"
     networks:
       - pedidos360-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/api/brokers"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/actuator/health"]
       interval: 10s
       timeout: 12s
       retries: 10

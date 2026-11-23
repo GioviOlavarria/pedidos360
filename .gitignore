@@ -1,0 +1,20 @@
+# IDEs y sistema operativo (cada desarrollador usa su propia configuración)
+.idea/
+*.iml
+.vscode/
+!frontend-pedidos360/.vscode/
+.DS_Store
+Thumbs.db
+
+# Archivos temporales y logs
+*.log
+*.tmp
+
+# Variables de entorno con secretos
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Material de la asignatura (no es parte del código)
+*.pdf

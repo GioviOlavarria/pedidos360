@@ -10,6 +10,7 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestClient;
@@ -26,7 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(RabbitAdminController.class)
+@WebMvcTest(controllers = RabbitAdminController.class, properties = AdminJwtTestConfig.API_CLIENT_ID)
+@Import({SecurityConfig.class, AdminJwtTestConfig.class})
 class RabbitAdminControllerTests {
 
     @Autowired
