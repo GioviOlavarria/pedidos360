@@ -3,6 +3,9 @@ package com.pedidos360.kafkaadmin;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.errors.AuthorizationException;
+import org.apache.kafka.common.errors.GroupIdNotFoundException;
+import org.apache.kafka.common.errors.GroupNotEmptyException;
+import org.apache.kafka.common.errors.UnknownMemberIdException;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
@@ -34,6 +37,17 @@ public class KafkaAdminExceptionHandler {
     @ExceptionHandler(UnknownTopicOrPartitionException.class)
     public ProblemDetail topicNotFound() {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "El tópico no existe");
+    }
+
+    @ExceptionHandler(GroupIdNotFoundException.class)
+    public ProblemDetail groupNotFound() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "El consumer group no existe");
+    }
+
+    @ExceptionHandler({GroupNotEmptyException.class, UnknownMemberIdException.class})
+    public ProblemDetail groupNotEmpty() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "El consumer group tiene consumidores activos: detenlos antes de esta operación");
     }
 
     @ExceptionHandler(TopicExistsException.class)
