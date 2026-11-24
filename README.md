@@ -72,6 +72,17 @@ Si vas a levantar el proyecto en tu entorno local o en otro equipo, sólo necesi
    
    *(La variable `BFF_URL` es la URL del BFF que usará el navegador: `http://localhost:8080` en local. Por compatibilidad también se acepta `VITE_BFF_URL`).*
 
+   **Base de datos cloud (Aiven MySQL 8)**: orders, catalog y payments usan una base MySQL administrada en
+   [Aiven](https://console.aiven.io) (plan Free) con conexión cifrada TLS. En `.env`:
+   ```
+   DB_URL=jdbc:mysql://<host>.aivencloud.com:<puerto>/pedidos360_db?sslMode=REQUIRED&serverTimezone=UTC
+   DB_USER=avnadmin
+   DB_PASSWORD=<contraseña del servicio en Aiven>
+   ```
+   Las tablas las crea Hibernate al arrancar (`ddl-auto: update`). Sin `DB_URL` se usa el contenedor `mysql`
+   del compose (desarrollo local). Si el servicio de Aiven se apaga por inactividad, se enciende con
+   **Power on** en la consola de Aiven.
+
 3. **Inicia los servicios**:
    Estando en la carpeta `infra`, ejecuta el comando de Docker Compose:
    ```bash
