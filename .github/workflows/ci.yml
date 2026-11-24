@@ -31,6 +31,26 @@ jobs:
         chmod +x mvnw
         ./mvnw -B test
 
+    # Deja el motivo de cada test fallido como annotation (visible sin abrir el log).
+    - name: Report test failures
+      if: failure()
+      working-directory: ./${{ matrix.service }}
+      run: |
+        for f in target/surefire-reports/*.txt; do
+          [ -f "$f" ] || continue
+          if grep -qE "(FAILURE|ERROR)!" "$f"; then
+            msg=$(grep -E -A6 "<<< (FAILURE|ERROR)!" "$f" | head -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=${{ matrix.service }} $(basename "$f" .txt)::${msg}"
+          fi
+        done
+
+    - name: Upload test reports
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: surefire-${{ matrix.service }}
+        path: ${{ matrix.service }}/target/surefire-reports/
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

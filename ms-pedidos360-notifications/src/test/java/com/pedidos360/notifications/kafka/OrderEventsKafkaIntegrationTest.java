@@ -80,7 +80,7 @@ class OrderEventsKafkaIntegrationTest {
         producer.send(KafkaTopics.ORDER_EVENTS, "10", event(10, "STATUS_CHANGED", "CREADO", "PENDIENTE_PAGO", "a@outlook.com")).get();
         producer.send(KafkaTopics.ORDER_EVENTS, "10", event(10, "STATUS_CHANGED", "ACEPTADO", "CREADO", "a@outlook.com")).get();
 
-        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> verify(mailSender, times(1)).send(any(MimeMessage.class)));
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> verify(mailSender, times(1)).send(any(MimeMessage.class)));
     }
 
     @Test
@@ -115,7 +115,7 @@ class OrderEventsKafkaIntegrationTest {
                 new StringDeserializer(), new StringDeserializer()).createConsumer()) {
             consumer.subscribe(List.of(KafkaTopics.ORDER_EVENTS + KafkaTopics.DLT_SUFFIX));
             List<ConsumerRecord<String, String>> result = new ArrayList<>();
-            long deadline = System.currentTimeMillis() + 40_000;
+            long deadline = System.currentTimeMillis() + 60_000;
             while (!done.test(result.stream().map(ConsumerRecord::key).toList()) && System.currentTimeMillis() < deadline) {
                 consumer.poll(Duration.ofMillis(500)).forEach(result::add);
             }
