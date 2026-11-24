@@ -25,11 +25,21 @@ jobs:
         java-version: '21'
         cache: maven
 
-    - name: Run tests
+    # Maven Central a veces responde 429 (Too Many Requests): se reintenta la descarga antes de los tests.
+    - name: Download dependencies
       working-directory: ./${{ matrix.service }}
       run: |
         chmod +x mvnw
-        ./mvnw -B test
+        for i in 1 2 3; do
+          ./mvnw -B -q dependency:go-offline && exit 0
+          echo "::warning::Descarga de dependencias falló (intento $i), reintentando en $((i * 30)) s"
+          sleep $((i * 30))
+        done
+        exit 1
+
+    - name: Run tests
+      working-directory: ./${{ matrix.service }}
+      run: ./mvnw -B test
 
     # Deja el motivo de cada test fallido como annotation (visible sin abrir el log).
     - name: Report test failures
@@ -107,7 +117,15 @@ jobs:
     - name: Build Docker image (${{ matrix.service }})
       working-directory: ./infra
       run: |
-        if ! docker compose --progress=plain build ${{ matrix.service }} > build.log 2>&1; then
+        # Reintenta si Maven Central o npm limitan las descargas (429) durante el build.
+        ok=false
+        for i in 1 2 3; do
+          if docker compose --progress=plain build ${{ matrix.service }} > build.log 2>&1; then ok=true; break; fi
+          grep -qE "429|Too Many Requests|ETIMEDOUT|Could not transfer" build.log || break
+          echo "::warning::Build de ${{ matrix.service }} falló por la red (intento $i), reintentando en $((i * 30)) s"
+          sleep $((i * 30))
+        done
+        if [ "$ok" != true ]; then
           cat build.log
           # Últimas líneas del error como annotation (visible en el resumen de la ejecución).
           msg=$(grep -v -- '-----' build.log | tail -n 25 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')
