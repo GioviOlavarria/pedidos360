@@ -51,6 +51,15 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "El pedido #" + orderId + " no está pendiente de pago (estado " + order.status() + ")");
         }
+        // Si un intento anterior ya se pagó en la pasarela (p. ej. falló el retorno), no se cobra dos veces.
+        boolean alreadyPaid = payments.findByOrderIdAndStatus(orderId, PaymentStatus.PENDING).stream()
+                .filter(p -> p.getToken() != null)
+                .map(p -> confirm(p.getToken()))
+                .anyMatch(p -> p.getStatus() == PaymentStatus.PAID);
+        if (alreadyPaid) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El pedido #" + orderId + " ya fue pagado; la confirmación se está procesando");
+        }
         Payment payment = payments.save(new Payment(orderId, order.total().setScale(0, RoundingMode.HALF_UP),
                 gateway.name(), order.customerEmail()));
 

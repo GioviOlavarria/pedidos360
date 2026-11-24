@@ -56,6 +56,9 @@ class PaymentApiTest {
     @Autowired
     private PaymentRepository payments;
 
+    @Autowired
+    private com.pedidos360.payments.gateway.SimulatedPaymentGateway gateway;
+
     @MockBean
     private OrdersClient orders;
 
@@ -130,6 +133,20 @@ class PaymentApiTest {
                 .andExpect(jsonPath("$.orderId").value(15));
         mvc.perform(get("/api/payments/token/" + token).with(user("otro@outlook.com")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void retryingAfterALostReturnDoesNotChargeTwice() throws Exception {
+        String token = startCheckout();
+        // Se pagó en la pasarela, pero el retorno nunca llegó: el pedido sigue PENDIENTE_PAGO.
+        gateway.resolve(token, true);
+
+        mvc.perform(post("/api/payments").with(user("cliente@outlook.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"orderId\":15}"))
+                .andExpect(status().isConflict());
+        assertEquals("PAID", payments.findByToken(token).orElseThrow().getStatus().name());
+        verify(kafka).send(eq("pedidos360.payments.events"), eq("15"), any());
+        assertEquals(1, payments.findByOrderIdOrderByCreatedAtDesc(15L).size());
     }
 
     private String startCheckout() throws Exception {

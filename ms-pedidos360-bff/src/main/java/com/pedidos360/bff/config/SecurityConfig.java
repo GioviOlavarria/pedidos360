@@ -68,8 +68,21 @@ public class SecurityConfig {
         config.setAllowedHeaders(List.of("*"));
         config.setMaxAge(3600L);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", config);
-        return source;
+        // La pasarela devuelve al comprador con un formulario POST desde su dominio (Origin: https://sandbox.flow.cl).
+        // Es una navegación, no una llamada XHR: se acepta cualquier origen sin credenciales en esas dos rutas.
+        CorsConfiguration gatewayCallbacks = new CorsConfiguration();
+        gatewayCallbacks.setAllowedOriginPatterns(List.of("*"));
+        gatewayCallbacks.setAllowedMethods(List.of("GET", "POST"));
+
+        UrlBasedCorsConfigurationSource callbacks = new UrlBasedCorsConfigurationSource();
+        callbacks.registerCorsConfiguration("/api/payments/*/return", gatewayCallbacks);
+        callbacks.registerCorsConfiguration("/api/payments/*/confirmation", gatewayCallbacks);
+        UrlBasedCorsConfigurationSource api = new UrlBasedCorsConfigurationSource();
+        api.registerCorsConfiguration("/api/**", config);
+
+        return exchange -> {
+            CorsConfiguration callback = callbacks.getCorsConfiguration(exchange);
+            return callback != null ? callback : api.getCorsConfiguration(exchange);
+        };
     }
 }

@@ -40,6 +40,14 @@ class MsPedidos360BffApplicationTests {
         client.post().uri("/api/payments/flow/return")
                 .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
                 .bodyValue("token=abc").exchange().expectStatus().isEqualTo(503);
+        // El navegador envía Origin: https://sandbox.flow.cl en ese POST: el CORS no debe responder 403.
+        client.post().uri("http://localhost/api/payments/flow/return")
+                .header("Origin", "https://sandbox.flow.cl")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("token=abc").exchange().expectStatus().isEqualTo(503);
+        // El resto de la API sigue limitado al origen del frontend.
+        client.get().uri("http://localhost/api/catalog").header("Origin", "https://sandbox.flow.cl")
+                .exchange().expectStatus().isForbidden();
     }
 
     @Test
