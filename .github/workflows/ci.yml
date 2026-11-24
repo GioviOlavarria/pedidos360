@@ -23,18 +23,27 @@ jobs:
       with:
         distribution: temurin
         java-version: '21'
-        cache: maven
 
-    # Maven Central a veces responde 429 (Too Many Requests): se reintenta la descarga antes de los tests.
+    # Caché de Maven por microservicio: con una clave común solo un job de la matriz la guardaba y el resto
+    # descargaba todo desde Maven Central en cada ejecución (y Central respondía 429).
+    - name: Cache Maven repository
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: m2-${{ matrix.service }}-${{ hashFiles(format('{0}/pom.xml', matrix.service)) }}
+        restore-keys: m2-${{ matrix.service }}-
+
+    # Si Maven Central responde 429 (Too Many Requests) se reintenta la descarga antes de los tests.
     - name: Download dependencies
       working-directory: ./${{ matrix.service }}
       run: |
         chmod +x mvnw
-        for i in 1 2 3; do
-          ./mvnw -B -q dependency:go-offline && exit 0
-          echo "::warning::Descarga de dependencias falló (intento $i), reintentando en $((i * 30)) s"
-          sleep $((i * 30))
+        for i in 1 2 3 4; do
+          ./mvnw -B dependency:go-offline > deps.log 2>&1 && exit 0
+          echo "::warning::Descarga de dependencias falló (intento $i): $(grep -m1 -E '\[ERROR\]' deps.log | cut -c1-300)"
+          sleep $((i * 45))
         done
+        tail -n 40 deps.log
         exit 1
 
     - name: Run tests
