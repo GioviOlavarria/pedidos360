@@ -1,0 +1,106 @@
+name: Deploy AWS
+
+# Despliega en la EC2 del AWS Academy Learner Lab (detrás de AWS API Gateway) cada vez que el CI de main
+# termina bien, o a mano desde la pestaña Actions. Las imágenes las publica el CI en GHCR; aquí solo se
+# escribe el .env del servidor con GitHub Secrets, se descargan las imágenes y se reinician los contenedores.
+#
+# Si el Learner Lab está apagado la EC2 está detenida y este workflow falla: basta con volver a ejecutarlo
+# ("Re-run jobs") con el lab encendido.
+
+on:
+  workflow_run:
+    workflows: [ "CI/CD Pipeline" ]
+    types: [ completed ]
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      EC2_HOST: ${{ vars.EC2_HOST }}
+      CLOUD_URL: ${{ vars.CLOUD_URL }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Write server .env from GitHub Secrets
+      env:
+        DB_URL: ${{ secrets.DB_URL }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
+        AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+        AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        API_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+        ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+        ADMIN_TENANT_ID: ${{ secrets.ADMIN_TENANT_ID }}
+        INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+        RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
+        RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+        RABBITMQ_ERLANG_COOKIE: ${{ secrets.RABBITMQ_ERLANG_COOKIE }}
+        MAIL_HOST: ${{ secrets.MAIL_HOST }}
+        MAIL_PORT: ${{ secrets.MAIL_PORT }}
+        MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+        MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        MAIL_SMTP_AUTH: ${{ secrets.MAIL_SMTP_AUTH }}
+        MAIL_SMTP_STARTTLS: ${{ secrets.MAIL_SMTP_STARTTLS }}
+        MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        PAYMENT_PROVIDER: ${{ secrets.PAYMENT_PROVIDER }}
+        FLOW_API_URL: ${{ secrets.FLOW_API_URL }}
+        FLOW_API_KEY: ${{ secrets.FLOW_API_KEY }}
+        FLOW_SECRET_KEY: ${{ secrets.FLOW_SECRET_KEY }}
+        IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}/pedidos360
+        IMAGE_TAG: ${{ github.event.workflow_run.head_sha || 'latest' }}
+      run: |
+        export IMAGE_REGISTRY="${IMAGE_REGISTRY,,}"
+        bash infra/scripts/write-env.sh infra/.env cloud
+
+    - name: Configure SSH
+      env:
+        EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ec2 && chmod 600 ~/.ssh/ec2
+        ssh-keyscan -T 20 "$EC2_HOST" >> ~/.ssh/known_hosts
+
+    - name: Upload compose files
+      run: |
+        ssh -i ~/.ssh/ec2 ubuntu@"$EC2_HOST" 'mkdir -p /opt/pedidos360/infra'
+        scp -i ~/.ssh/ec2 -r infra/docker-compose.yml infra/docker-compose.cloud.yml infra/.env \
+          infra/kafka infra/rabbitmq ubuntu@"$EC2_HOST":/opt/pedidos360/infra/
+
+    - name: Pull images and restart
+      env:
+        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "$GHCR_TOKEN" | ssh -i ~/.ssh/ec2 ubuntu@"$EC2_HOST" docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        ssh -i ~/.ssh/ec2 ubuntu@"$EC2_HOST" bash -s <<'REMOTE'
+        set -eu
+        cd /opt/pedidos360/infra
+        compose="docker compose -f docker-compose.yml -f docker-compose.cloud.yml"
+        $compose pull --quiet
+        docker logout ghcr.io >/dev/null
+        $compose up -d --no-build --remove-orphans
+        docker image prune -f >/dev/null
+        $compose ps --format 'table {{.Name}}\t{{.Status}}'
+        REMOTE
+
+    - name: Smoke test through API Gateway
+      run: |
+        for i in $(seq 1 20); do
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$CLOUD_URL/api/catalog") && [ "$code" = 200 ] && break
+          sleep 15
+        done
+        echo "GET $CLOUD_URL/api/catalog -> $code"
+        [ "$code" = 200 ]
+        curl -sf -o /dev/null "$CLOUD_URL/" && echo "Frontend OK: $CLOUD_URL"

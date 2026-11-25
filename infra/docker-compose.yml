@@ -118,6 +118,7 @@ services:
 
   # API REST para crear/eliminar colas, exchanges y bindings del clúster RabbitMQ (puerto 8086).
   rabbit-admin:
+    image: ${IMAGE_REGISTRY:-pedidos360}/rabbit-admin:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-rabbit-admin
       dockerfile: Dockerfile
@@ -148,6 +149,7 @@ services:
       start_period: 20s
 
   orders:
+    image: ${IMAGE_REGISTRY:-pedidos360}/orders:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-orders
       dockerfile: Dockerfile
@@ -192,6 +194,7 @@ services:
       start_period: 45s
 
   catalog:
+    image: ${IMAGE_REGISTRY:-pedidos360}/catalog:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-catalog
       dockerfile: Dockerfile
@@ -226,6 +229,7 @@ services:
 
   # Pasarela de pago (Flow). PAYMENT_PROVIDER=simulado permite probar el flujo completo sin cuenta en Flow.
   payments:
+    image: ${IMAGE_REGISTRY:-pedidos360}/payments:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-payments
       dockerfile: Dockerfile
@@ -268,6 +272,7 @@ services:
       start_period: 45s
 
   bff:
+    image: ${IMAGE_REGISTRY:-pedidos360}/bff:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-bff
       dockerfile: Dockerfile
@@ -299,6 +304,7 @@ services:
       start_period: 45s
 
   frontend:
+    image: ${IMAGE_REGISTRY:-pedidos360}/frontend:${IMAGE_TAG:-latest}
     build:
       context: ../frontend-pedidos360
       dockerfile: Dockerfile
@@ -320,6 +326,7 @@ services:
       - pedidos360-net
 
   notifications:
+    image: ${IMAGE_REGISTRY:-pedidos360}/notifications:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-notifications
       dockerfile: Dockerfile
@@ -440,6 +447,7 @@ services:
 
   # API REST para administrar tópicos, configuraciones, brokers y consumer groups (puerto 8084).
   kafka-admin:
+    image: ${IMAGE_REGISTRY:-pedidos360}/kafka-admin:${IMAGE_TAG:-latest}
     build:
       context: ../ms-pedidos360-kafka-admin
       dockerfile: Dockerfile

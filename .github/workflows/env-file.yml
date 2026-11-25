@@ -1,0 +1,62 @@
+name: Env file
+
+# Genera infra/.env (para levantar el proyecto en un PC) a partir de GitHub Secrets. Los secrets no se pueden
+# leer fuera de Actions, así que el archivo sale cifrado (AES-256, clave = secret ENV_PASSPHRASE) como
+# artifact de 1 día. scripts/pull-env.sh ejecuta este workflow, descarga el artifact y lo descifra.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  env-file:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Write .env from GitHub Secrets
+      env:
+        DB_URL: ${{ secrets.DB_URL }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
+        AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+        AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        API_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+        ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+        ADMIN_TENANT_ID: ${{ secrets.ADMIN_TENANT_ID }}
+        INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+        RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
+        RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+        RABBITMQ_ERLANG_COOKIE: ${{ secrets.RABBITMQ_ERLANG_COOKIE }}
+        MAIL_HOST: ${{ secrets.MAIL_HOST }}
+        MAIL_PORT: ${{ secrets.MAIL_PORT }}
+        MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+        MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        MAIL_SMTP_AUTH: ${{ secrets.MAIL_SMTP_AUTH }}
+        MAIL_SMTP_STARTTLS: ${{ secrets.MAIL_SMTP_STARTTLS }}
+        MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        PAYMENT_PROVIDER: ${{ secrets.PAYMENT_PROVIDER }}
+        FLOW_API_URL: ${{ secrets.FLOW_API_URL }}
+        FLOW_API_KEY: ${{ secrets.FLOW_API_KEY }}
+        FLOW_SECRET_KEY: ${{ secrets.FLOW_SECRET_KEY }}
+      run: bash infra/scripts/write-env.sh "$RUNNER_TEMP/.env" local
+
+    - name: Encrypt
+      env:
+        ENV_PASSPHRASE: ${{ secrets.ENV_PASSPHRASE }}
+      run: |
+        if [ -z "$ENV_PASSPHRASE" ]; then echo "::error::Falta el secret ENV_PASSPHRASE"; exit 1; fi
+        openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:ENV_PASSPHRASE \
+          -in "$RUNNER_TEMP/.env" -out env.enc
+        rm "$RUNNER_TEMP/.env"
+
+    - name: Upload encrypted .env
+      uses: actions/upload-artifact@v4
+      with:
+        name: env-encrypted
+        path: env.enc
+        retention-days: 1

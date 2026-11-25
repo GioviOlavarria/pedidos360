@@ -274,6 +274,49 @@ npm test         # pruebas unitarias (Vitest)
 npm run build    # build de producción en dist/
 ```
 
+## Despliegue en AWS (API Gateway + EC2)
+
+```text
+Navegador ──HTTPS──> AWS API Gateway (HTTP API "pedidos360-gateway")
+                       ├─ ANY /api/{proxy+} ──> EC2 :8080  BFF ──> orders, catalog, payments
+                       └─ ANY /{proxy+}, GET / ──> EC2 :3000  frontend Angular (Nginx)
+EC2 t3.large (AWS Academy Learner Lab, IP elástica) ── docker compose (Kafka, RabbitMQ, microservicios)
+                                                    ── MySQL administrado en Aiven (TLS)
+```
+
+- **URL pública**: variable `CLOUD_URL` del repositorio (`https://<id>.execute-api.us-east-1.amazonaws.com`).
+  Frontend y API comparten ese dominio HTTPS, así que no hay CORS entre ellos y Entra ID acepta el redirect
+  `<CLOUD_URL>/auth/callback` (agregado en la App Registration del frontend como plataforma SPA).
+- **CI/CD**: en cada push a `main` el workflow *CI/CD Pipeline* prueba todo, construye las imágenes y las publica
+  en GHCR (`ghcr.io/<owner>/pedidos360/<servicio>:<sha>`). Luego *Deploy AWS* entra por SSH a la EC2, escribe el
+  `.env` del servidor desde GitHub Secrets, descarga las imágenes y reinicia con
+  `docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d` (heap de cada JVM acotado).
+- **Learner Lab**: al terminar la sesión la EC2 se detiene; al volver a iniciar el lab arranca sola y los
+  contenedores se levantan (`restart: unless-stopped`). La IP elástica mantiene la URL de API Gateway.
+  Si un deploy falló con el lab apagado, se reejecuta desde *Actions → Deploy AWS → Run workflow*.
+
+## GitHub Secrets (sin editar el .env en cada PC)
+
+Todos los valores sensibles viven en *Settings → Secrets and variables → Actions*:
+
+| Tipo | Nombres |
+| --- | --- |
+| Secrets | `DB_URL`, `DB_USER`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `AZURE_AD_TENANT_ID`, `AZURE_AD_CLIENT_ID`, `API_CLIENT_ID`, `ADMIN_EMAILS`, `INTERNAL_API_KEY`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `RABBITMQ_ERLANG_COOKIE`, `PAYMENT_PROVIDER`, `FLOW_API_URL`, `FLOW_API_KEY`, `FLOW_SECRET_KEY`, `EC2_SSH_KEY`, `ENV_PASSPHRASE` (opcionales: `ADMIN_TENANT_ID`, `MAIL_*`) |
+| Variables | `CLOUD_URL` (URL de API Gateway), `EC2_HOST` (IP elástica de la EC2) |
+
+Los secrets no se pueden leer fuera de GitHub Actions. Para obtener el `.env` en un PC nuevo:
+
+```bash
+# Requiere GitHub CLI (winget install GitHub.cli) y Git Bash en Windows
+gh auth login
+bash scripts/pull-env.sh      # pide la clave ENV_PASSPHRASE
+cd infra && docker compose up --build -d
+```
+
+El script ejecuta el workflow *Env file*, que arma el `.env` con `infra/scripts/write-env.sh`, lo cifra con
+`ENV_PASSPHRASE` (AES-256) y lo deja como artifact de 1 día; el script lo descarga, lo descifra en `infra/.env`
+y crea también `frontend-pedidos360/.env.local`. Para cambiar un valor: `gh secret set NOMBRE`.
+
 ## Tecnologías Utilizadas
 
 ### Frontend

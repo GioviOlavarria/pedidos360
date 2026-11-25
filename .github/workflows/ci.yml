@@ -104,6 +104,13 @@ jobs:
       matrix:
         # Una imagen por job: si falla, el nombre del job indica cuál y el error queda como annotation.
         service: [ bff, catalog, orders, notifications, payments, frontend, kafka-admin, rabbit-admin ]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # En push a main las imágenes se publican en GHCR (las despliega deploy.yml en AWS).
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      IMAGE_TAG: ${{ github.sha }}
 
     steps:
     - name: Checkout code
@@ -112,16 +119,20 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    # Solo el frontend usa valores al compilar (identificadores públicos de Entra ID y la URL de la API).
+    # En main la imagen es la que se despliega en AWS, así que apunta a API Gateway (variable CLOUD_URL).
     - name: Create .env file from GitHub Secrets
-      working-directory: ./infra
+      env:
+        AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+        AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        API_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+        ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+        CLOUD_URL: ${{ vars.CLOUD_URL }}
       run: |
-        echo "DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}" >> .env
-        echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-        echo "AZURE_AD_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}" >> .env
-        echo "AZURE_AD_CLIENT_ID=${{ secrets.AZURE_AD_CLIENT_ID }}" >> .env
-        echo "API_CLIENT_ID=${{ secrets.API_CLIENT_ID }}" >> .env
-        echo "VITE_BFF_URL=${{ secrets.VITE_BFF_URL }}" >> .env
+        registry="ghcr.io/${{ github.repository_owner }}/pedidos360"
+        echo "IMAGE_REGISTRY=${registry,,}" >> "$GITHUB_ENV"
+        if [ "$PUBLISH" = true ] && [ -n "$CLOUD_URL" ]; then mode=cloud; else mode=local; fi
+        bash infra/scripts/write-env.sh infra/.env "$mode"
 
     - name: Build Docker image (${{ matrix.service }})
       working-directory: ./infra
@@ -142,3 +153,13 @@ jobs:
           exit 1
         fi
         tail -n 5 build.log
+
+    - name: Push image to GHCR (${{ matrix.service }})
+      if: env.PUBLISH == 'true'
+      working-directory: ./infra
+      run: |
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        image="$IMAGE_REGISTRY/${{ matrix.service }}"
+        docker compose push ${{ matrix.service }}
+        docker tag "$image:$IMAGE_TAG" "$image:latest"
+        docker push "$image:latest"

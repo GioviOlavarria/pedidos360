@@ -1,0 +1,36 @@
+# Ajustes para el despliegue en la nube (EC2 t3.large detrás de AWS API Gateway).
+# Las imágenes no se compilan en el servidor: GitHub Actions las publica en GHCR y aquí solo se descargan.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --no-build
+#
+# Las variables (.env) las escribe el workflow deploy.yml a partir de GitHub Secrets.
+
+# Cada JVM con heap acotado: 7 microservicios + Kafka + RabbitMQ deben caber en 8 GB.
+x-jvm: &jvm
+  JAVA_TOOL_OPTIONS: -Xms128m -Xmx320m -XX:+UseSerialGC -Xss512k
+
+services:
+  bff:
+    environment: *jvm
+  orders:
+    environment: *jvm
+  catalog:
+    environment: *jvm
+  payments:
+    environment: *jvm
+  notifications:
+    environment: *jvm
+  kafka-admin:
+    environment: *jvm
+  rabbit-admin:
+    environment: *jvm
+  kafka:
+    environment:
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx384m
+  kafka2:
+    environment:
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx384m
+  zookeeper:
+    environment:
+      KAFKA_HEAP_OPTS: -Xms64m -Xmx128m
