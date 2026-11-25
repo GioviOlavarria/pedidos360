@@ -174,6 +174,9 @@ services:
       DB_URL:         ${DB_URL:-jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
       DB_USER:        ${DB_USER:-pedidos360user}
       DB_PASSWORD:    ${DB_PASSWORD:-pedidos360pass}
+      # Aiven Free admite pocas conexiones: pool chico para que el stack local y el de AWS quepan juntos.
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-4}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 1
       API_CLIENT_ID:  ${API_CLIENT_ID}
       ADMIN_EMAILS:   ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
       ADMIN_TENANT_ID: ${ADMIN_TENANT_ID:-}
@@ -211,6 +214,9 @@ services:
       DB_URL:         ${DB_URL:-jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
       DB_USER:        ${DB_USER:-pedidos360user}
       DB_PASSWORD:    ${DB_PASSWORD:-pedidos360pass}
+      # Aiven Free admite pocas conexiones: pool chico para que el stack local y el de AWS quepan juntos.
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-4}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 1
       API_CLIENT_ID:  ${API_CLIENT_ID}
       ADMIN_EMAILS:   ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
       ADMIN_TENANT_ID: ${ADMIN_TENANT_ID:-}
@@ -247,6 +253,9 @@ services:
       DB_URL:         ${DB_URL:-jdbc:mysql://mysql:3306/pedidos360_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
       DB_USER:        ${DB_USER:-pedidos360user}
       DB_PASSWORD:    ${DB_PASSWORD:-pedidos360pass}
+      # Aiven Free admite pocas conexiones: pool chico para que el stack local y el de AWS quepan juntos.
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-4}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 1
       API_CLIENT_ID:  ${API_CLIENT_ID}
       ADMIN_EMAILS:   ${ADMIN_EMAILS:-gi.olavarria@duocuc.cl}
       ADMIN_TENANT_ID: ${ADMIN_TENANT_ID:-}
