@@ -48,8 +48,8 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
-        return ResponseEntity.ok(mapToResponse(orderService.findById(id)));
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(mapToResponse(orderService.findVisibleTo(id, CurrentUser.from(authentication))));
     }
 
     @PatchMapping("/{id}/status")

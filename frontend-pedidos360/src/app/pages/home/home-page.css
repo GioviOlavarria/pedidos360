@@ -99,57 +99,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Pestañas */
-.tabs {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 28px;
-  border-bottom: 1px solid var(--slate-200);
-  padding-bottom: 14px;
-  flex-wrap: wrap;
-}
-.tabs-label {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--slate-500);
-  margin-right: 6px;
-}
-.tab {
-  padding: 9px 18px;
-  border-radius: 10px;
-  border: none;
-  font-weight: 500;
-  font-size: 0.88rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #fff;
-  color: var(--slate-600);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  transition: all 0.15s ease;
-}
-.tab.active {
-  font-weight: 700;
-  background: var(--navy);
-  color: #fff;
-  box-shadow: 0 3px 10px rgba(0, 48, 135, 0.2);
-}
-.session {
-  margin-left: auto;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 12px;
-  background: var(--slate-100);
-  color: var(--slate-500);
-}
-.session.on {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
 /* Segmentos */
 .segment {
   margin-bottom: 44px;

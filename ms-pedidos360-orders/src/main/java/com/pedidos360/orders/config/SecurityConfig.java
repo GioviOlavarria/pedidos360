@@ -14,7 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Configuración de seguridad para ms-pedidos360-orders.
- *  - GET /api/orders/{id}: público (seguimiento de envíos por número de pedido).
+ *  - GET /api/orders/{id}: autenticado (seguimiento: Admin/Operator cualquiera, Customer solo los suyos).
  *  - GET /api/orders: autenticado (Admin ve todos, Customer solo los suyos).
  *  - POST /api/orders: autenticado (compra).
  *  - PATCH /api/orders/{id}/status: Admin u Operator.
@@ -43,8 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         // Servicio a servicio (payments): protegido con X-Internal-Api-Key, no se expone por el BFF.
                         .requestMatchers("/internal/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/orders/*").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/orders").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/orders", "/api/orders/*").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasAnyRole("Admin", "Operator")
                         .anyRequest().hasRole("Admin")

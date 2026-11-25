@@ -11,8 +11,6 @@ import { MoneyPipe } from '../../shared/money.pipe';
 import { StatusBadge } from '../../shared/status-badge';
 import { DatePipe } from '@angular/common';
 
-type Segment = 'all' | 'products' | 'tracking';
-
 const TRACKING_STEPS: { key: OrderStatus; label: string; desc: string; icon: string }[] = [
   { key: 'CREADO', label: 'Creado', desc: 'Pedido ingresado en sistema', icon: '📝' },
   { key: 'ACEPTADO', label: 'Aceptado', desc: 'Validación comercial aprobada', icon: '✅' },
@@ -21,7 +19,10 @@ const TRACKING_STEPS: { key: OrderStatus; label: string; desc: string; icon: str
   { key: 'ENTREGADO', label: 'Entregado', desc: 'Entregado conforme en destino', icon: '🎉' },
 ];
 
-/** Inicio público: productos para seleccionar y seguimiento de pedidos por número (sin iniciar sesión). */
+/**
+ * Inicio público (/): productos para seleccionar y, con sesión, el seguimiento de los pedidos propios.
+ * /tracking (requiere sesión): solo el seguimiento; el Admin puede consultar cualquier pedido.
+ */
 @Component({
   selector: 'app-home-page',
   imports: [RouterLink, MoneyPipe, StatusBadge, DatePipe],
@@ -37,14 +38,9 @@ export class HomePage implements OnInit {
   protected readonly auth = inject(AuthService);
 
   protected readonly steps = TRACKING_STEPS;
-  protected readonly demoIds = [1, 2, 3, 4];
-  protected readonly tabs: { key: Segment; label: string; icon: string }[] = [
-    { key: 'all', label: 'Todos los segmentos', icon: '📑' },
-    { key: 'products', label: '1. Productos para Seleccionar', icon: '🛍️' },
-    { key: 'tracking', label: '2. Seguimiento de Pedidos', icon: '📦' },
-  ];
 
-  protected readonly segment = signal<Segment>('all');
+  /** En /tracking se muestra solo el seguimiento (sin el catálogo). */
+  protected readonly trackingOnly = this.route.snapshot.data['segment'] === 'tracking';
 
   // Productos
   protected readonly products = signal<Product[]>([]);
@@ -67,6 +63,8 @@ export class HomePage implements OnInit {
   protected readonly trackedOrder = signal<Order | null>(null);
   protected readonly loadingTracking = signal(false);
   protected readonly trackingError = signal('');
+  /** Accesos rápidos: los pedidos recientes que el usuario puede ver (los suyos; el Admin, todos). */
+  protected readonly recentIds = signal<number[]>([]);
   protected readonly currentStep = computed(() => {
     const status = this.trackedOrder()?.status;
     const index = TRACKING_STEPS.findIndex((s) => s.key === status);
@@ -74,15 +72,24 @@ export class HomePage implements OnInit {
   });
 
   ngOnInit(): void {
-    // Un administrador usa su panel en vez del inicio público.
-    if (this.auth.isAdmin()) {
+    // Un administrador usa su panel en vez del inicio público (pero sí puede usar /tracking).
+    if (this.auth.isAdmin() && !this.trackingOnly) {
       void this.router.navigateByUrl('/dashboard', { replaceUrl: true });
       return;
     }
-    if (this.route.snapshot.data['segment'] === 'tracking') {
-      this.segment.set('tracking');
+    if (!this.trackingOnly) {
+      this.loadProducts();
     }
-    this.loadProducts();
+    if (this.auth.isAuthenticated()) {
+      this.loadRecentOrders();
+    }
+  }
+
+  private loadRecentOrders(): void {
+    this.orders.getOrders().subscribe({
+      next: (orders) => this.recentIds.set((orders ?? []).slice(0, 6).map((o) => o.id)),
+      error: () => this.recentIds.set([]),
+    });
   }
 
   private loadProducts(): void {
@@ -99,9 +106,8 @@ export class HomePage implements OnInit {
     });
   }
 
-  protected goTo(segment: Segment, anchor: string): void {
-    this.segment.set(segment);
-    setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' }));
+  protected goTo(anchor: string): void {
+    document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' });
   }
 
   protected qty(product: Product): number {
@@ -142,7 +148,9 @@ export class HomePage implements OnInit {
       error: (err: HttpErrorResponse) => {
         this.trackingError.set(
           err.status === 404
-            ? `No existe un pedido con el número #${id}.`
+            ? this.auth.isAdmin()
+              ? `No existe un pedido con el número #${id}.`
+              : `No encontramos el pedido #${id} entre tus pedidos.`
             : apiErrorMessage(err, 'No se pudo consultar el pedido. Intente nuevamente.'),
         );
         this.loadingTracking.set(false);

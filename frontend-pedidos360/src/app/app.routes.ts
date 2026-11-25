@@ -4,7 +4,8 @@ import { AppLayout } from './layout/app-layout';
 
 /**
  * Rutas y acceso por rol (Admin, Operator, Customer de Microsoft Entra ID):
- *   /, /inicio, /tracking → inicio público (catálogo y seguimiento de pedidos)
+ *   /, /inicio           → inicio público (catálogo; con sesión, también el seguimiento de sus pedidos)
+ *   /tracking            → seguimiento de envíos (autenticado: Admin ve todos, Customer solo los suyos)
  *   /catalog             → catálogo público
  *   /login               → inicio de sesión con Microsoft
  *   /auth/callback       → retorno del login (MSAL)
@@ -47,6 +48,7 @@ export const routes: Routes = [
       {
         path: 'tracking',
         title: 'Seguimiento · Pedidos360',
+        canActivate: [roleGuard([])],
         loadComponent: () => import('./pages/home/home-page').then((m) => m.HomePage),
         data: { segment: 'tracking' },
       },

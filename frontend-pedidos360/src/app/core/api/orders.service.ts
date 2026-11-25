@@ -15,7 +15,7 @@ export class OrdersService {
     return this.http.get<Order[]>(this.base);
   }
 
-  /** Seguimiento por número de pedido: público. */
+  /** Seguimiento por número de pedido (requiere sesión): Admin/Operator ven cualquiera, el cliente solo los suyos. */
   getOrder(id: number | string): Observable<Order> {
     return this.http.get<Order>(`${this.base}/${id}`);
   }

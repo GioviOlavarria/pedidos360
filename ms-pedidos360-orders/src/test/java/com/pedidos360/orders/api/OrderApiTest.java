@@ -84,8 +84,22 @@ class OrderApiTest {
     }
 
     @Test
-    void trackingByIdIsPublic() throws Exception {
-        mvc.perform(get("/api/orders/999")).andExpect(status().isNotFound());
+    void trackingRequiresLogin() throws Exception {
+        mvc.perform(get("/api/orders/999")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void customerTracksOnlyOwnOrdersAdminTracksAll() throws Exception {
+        long own = buy("a@outlook.com");
+        long other = buy("b@outlook.com");
+
+        mvc.perform(get("/api/orders/" + own).with(customer("a@outlook.com")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(own));
+        // Un pedido ajeno responde igual que uno inexistente.
+        mvc.perform(get("/api/orders/" + other).with(customer("a@outlook.com")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/orders/" + other).with(admin()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(other));
     }
 
     @Test

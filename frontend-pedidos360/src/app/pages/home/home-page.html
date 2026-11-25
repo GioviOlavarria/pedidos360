@@ -1,43 +1,33 @@
 <div class="p-page home">
   <!-- Bienvenida -->
-  <section class="hero">
-    <div class="hero-circle"></div>
-    <div class="hero-content">
-      <div class="hero-badge"><span>📦</span> Portal de Pedidos y Logística Blue Express</div>
-      <h1>Explora el Catálogo y Rastrea tus Envíos en Tiempo Real</h1>
-      <p>
-        Visualiza y selecciona nuestros productos disponibles, o ingresa el número de tu pedido para consultar el estado
-        de despacho al instante. Sin necesidad obligatoria de iniciar sesión.
-      </p>
-      <div class="hero-actions">
-        <button type="button" class="hero-btn primary" (click)="goTo('products', 'segmento-productos')">
-          <span>🛍️</span> Ver Productos para Seleccionar
-        </button>
-        <button type="button" class="hero-btn ghost" (click)="goTo('tracking', 'segmento-seguimiento')">
-          <span>🔍</span> Hacer Seguimiento a un Pedido
-        </button>
-        @if (!auth.isAuthenticated()) {
-          <a routerLink="/login" class="hero-btn white"><span>🔑</span> Iniciar sesión</a>
-        }
+  @if (!trackingOnly) {
+    <section class="hero">
+      <div class="hero-circle"></div>
+      <div class="hero-content">
+        <div class="hero-badge"><span>📦</span> Portal de Pedidos y Logística Blue Express</div>
+        <h1>Explora el Catálogo y Rastrea tus Envíos en Tiempo Real</h1>
+        <p>
+          Visualiza y selecciona nuestros productos disponibles. Inicia sesión para comprar y consultar el estado de
+          despacho de tus pedidos al instante.
+        </p>
+        <div class="hero-actions">
+          <button type="button" class="hero-btn primary" (click)="goTo('segmento-productos')">
+            <span>🛍️</span> Ver Productos para Seleccionar
+          </button>
+          @if (auth.isAuthenticated()) {
+            <button type="button" class="hero-btn ghost" (click)="goTo('segmento-seguimiento')">
+              <span>🔍</span> Hacer Seguimiento a un Pedido
+            </button>
+          } @else {
+            <a routerLink="/login" class="hero-btn white"><span>🔑</span> Iniciar sesión</a>
+          }
+        </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Pestañas -->
-  <div class="tabs">
-    <span class="tabs-label">Mostrar vista:</span>
-    @for (tab of tabs; track tab.key) {
-      <button type="button" class="tab" [class.active]="segment() === tab.key" (click)="segment.set(tab.key)">
-        <span>{{ tab.icon }}</span>{{ tab.label }}
-      </button>
-    }
-    <span class="session" [class.on]="auth.isAuthenticated()">
-      {{ auth.isAuthenticated() ? 'Conectado: ' + auth.displayName() : 'Visualizando en Modo Invitado' }}
-    </span>
-  </div>
+    </section>
+  }
 
   <!-- Segmento 1: productos -->
-  @if (segment() !== 'tracking') {
+  @if (!trackingOnly) {
     <section id="segmento-productos" class="segment">
       <div class="segment-header">
         <div>
@@ -106,8 +96,8 @@
     </section>
   }
 
-  <!-- Segmento 2: seguimiento -->
-  @if (segment() !== 'products') {
+  <!-- Segmento 2: seguimiento (solo con sesión) -->
+  @if (auth.isAuthenticated()) {
     <section id="segmento-seguimiento" class="segment">
       <div class="tracking">
         <div class="segment-title">
@@ -116,8 +106,13 @@
           <span class="p-tag admin">Rastreo en Vivo</span>
         </div>
         <p class="tracking-intro">
-          Ingresa el código o número identificador de tu pedido para visualizar la trazabilidad en tiempo real de tu
-          encomienda Blue Express, desde su creación hasta la entrega en destino.
+          @if (auth.isAdmin()) {
+            Ingresa el número de cualquier pedido para visualizar la trazabilidad de su envío, desde su creación hasta
+            la entrega en destino.
+          } @else {
+            Ingresa el número de uno de tus pedidos para visualizar la trazabilidad en tiempo real de tu encomienda
+            Blue Express, desde su creación hasta la entrega en destino.
+          }
         </p>
 
         <div class="tracking-form">
@@ -128,12 +123,14 @@
           </button>
         </div>
 
-        <div class="demo">
-          <span>Probar con pedidos de ejemplo:</span>
-          @for (id of demoIds; track id) {
-            <button type="button" (click)="track('' + id)">Pedido #{{ id }}</button>
-          }
-        </div>
+        @if (recentIds().length) {
+          <div class="demo">
+            <span>{{ auth.isAdmin() ? 'Pedidos recientes:' : 'Tus pedidos recientes:' }}</span>
+            @for (id of recentIds(); track id) {
+              <button type="button" (click)="track('' + id)">Pedido #{{ id }}</button>
+            }
+          </div>
+        }
 
         @if (trackingError()) {
           <div class="p-alert-error">{{ trackingError() }}</div>

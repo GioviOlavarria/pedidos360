@@ -132,6 +132,22 @@ public class OrderService {
         return orderRepository.findById(id).orElseThrow(() -> new OrderNotFoundException(id));
     }
 
+    /**
+     * Seguimiento de un pedido: Admin y Operator ven cualquiera; el cliente solo los suyos. Un pedido ajeno responde
+     * igual que uno inexistente (404) para no revelar qué números de pedido existen.
+     */
+    @Transactional(readOnly = true)
+    public Order findVisibleTo(Long id, CurrentUser user) {
+        Order order = findById(id);
+        if (user.canManageAllOrders()) {
+            return order;
+        }
+        if (user.email() == null || !user.email().equalsIgnoreCase(order.getCustomerEmail())) {
+            throw new OrderNotFoundException(id);
+        }
+        return order;
+    }
+
     public void deleteOrder(Long id) {
         Order order = findById(id);
         if (STOCK_IN_WAREHOUSE.contains(order.getStatus())) {

@@ -31,6 +31,7 @@ export class AppLayout {
         { path: '/dashboard', icon: '🏠', label: 'Panel principal', exact: true },
         { path: '/catalog', icon: '🗂️', label: 'Catálogo e Inventario' },
         { path: '/orders', icon: '📦', label: 'Gestión de Pedidos' },
+        { path: '/tracking', icon: '🔍', label: 'Seguimiento de Envíos' },
         { path: '/reports', icon: '📊', label: 'Reportes Financieros' },
       ];
     }
@@ -38,8 +39,12 @@ export class AppLayout {
       { path: '/', icon: '🏠', label: 'Inicio', exact: true },
       { path: '/catalog', icon: '🛍️', label: 'Catálogo de Productos' },
       { path: '/carrito', icon: '🛒', label: 'Carrito', cart: true },
-      ...(this.auth.isAuthenticated() ? [{ path: '/orders', icon: '📦', label: 'Mis Pedidos' }] : []),
-      { path: '/tracking', icon: '🔍', label: 'Seguimiento de Envíos' },
+      ...(this.auth.isAuthenticated()
+        ? [
+            { path: '/orders', icon: '📦', label: 'Mis Pedidos' },
+            { path: '/tracking', icon: '🔍', label: 'Seguimiento de Envíos' },
+          ]
+        : []),
     ];
   });
 
